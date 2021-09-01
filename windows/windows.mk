@@ -2,7 +2,7 @@ SOURCEFILES = ..\core\pubnub_pubsubapi.c ..\core\pubnub_coreapi.c ..\core\pubnub
 
 OBJFILES = pubnub_pubsubapi.obj pubnub_coreapi.obj pubnub_coreapi_ex.obj pubnub_ccore_pubsub.obj pubnub_ccore.obj pubnub_netcore.obj pbpal_sockets.obj pbpal_resolv_and_connect_sockets.obj pbpal_handle_socket_error.obj pubnub_alloc_std.obj pubnub_assert_std.obj pubnub_generate_uuid.obj pubnub_blocking_io.obj windows_socket_blocking_io.obj pubnub_free_with_timeout_std.obj pbtimespec_elapsed_ms.obj pbbase64.obj pubnub_timers.obj pubnub_json_parse.obj md5.obj pb_strnlen_s.obj pubnub_helper.obj pubnub_version_windows.obj pubnub_generate_uuid_windows.obj pbpal_windows_blocking_io.obj snprintf.obj miniz_tinfl.obj miniz_tdef.obj miniz.obj pbcrc32.obj pbgzip_compress.obj pbgzip_decompress.obj pbcc_subscribe_v2.obj pubnub_subscribe_v2.obj msstopwatch_windows.obj pubnub_url_encode.obj pbcc_advanced_history.obj pubnub_advanced_history.obj pbcc_objects_api.obj pubnub_objects_api.obj pbcc_actions_api.obj pubnub_actions_api.obj pubnub_memory_block.obj pbstr_remove_from_list.obj pb_sleep_ms.obj pbauto_heartbeat.obj pbauto_heartbeat_init_windows.obj
 
-LDLIBS=ws2_32.lib IPHlpAPI.lib rpcrt4.lib
+LDLIBS=ws2_32.lib IPHlpAPI.lib rpcrt4.lib gdi32.lib User32.lib shell32.lib advapi32.lib
 
 !ifndef ONLY_PUBSUB_API
 ONLY_PUBSUB_API = 0
