@@ -96,9 +96,6 @@ static int pal_init(void)
 {
     static bool s_init = false;
     if (!s_init) {
-        #if !defined(__UWP__)
-        ERR_load_BIO_strings(); //Per OpenSSL 3.0 this is deprecated. Allowing this stmt for non-UWP as it exists.
-        #endif
         SSL_load_error_strings();
         SSL_library_init();
         OpenSSL_add_all_algorithms();
