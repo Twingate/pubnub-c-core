@@ -1,4 +1,4 @@
-SOURCEFILES = ..\core\pubnub_pubsubapi.c ..\core\pubnub_coreapi.c ..\core\pubnub_coreapi_ex.c ..\core\pubnub_ccore_pubsub.c ..\core\pubnub_ccore.c ..\core\pubnub_netcore.c ..\lib\sockets\pbpal_sockets.c ..\lib\sockets\pbpal_resolv_and_connect_sockets.c ..\lib\sockets\pbpal_handle_socket_error.c ..\core\pubnub_alloc_std.c ..\core\pubnub_assert_std.c ..\core\pubnub_generate_uuid.c ..\core\pubnub_timers.c ..\core\pubnub_blocking_io.c ..\lib\base64\pbbase64.c ..\core\pubnub_json_parse.c ..\core\pubnub_free_with_timeout_std.c ..\windows\pbtimespec_elapsed_ms.c ..\lib\md5\md5.c ..\lib\pb_strnlen_s.c ..\core\pubnub_helper.c pubnub_version_windows.cpp ..\windows\pubnub_generate_uuid_windows.c ..\windows\pbpal_windows_blocking_io.c ..\windows\windows_socket_blocking_io.c ..\core\c99\snprintf.c ..\lib\miniz\miniz_tinfl.c ..\lib\miniz\miniz_tdef.c ..\lib\miniz\miniz.c ..\lib\pbcrc32.c ..\core\pbgzip_compress.c ..\core\pbgzip_decompress.c ..\core\pbcc_subscribe_v2.c ..\core\pubnub_subscribe_v2.c ..\windows\msstopwatch_windows.c ..\core\pubnub_url_encode.c ..\core\pbcc_advanced_history.c ..\core\pubnub_advanced_history.c ..\core\pbcc_objects_api.c ..\core\pubnub_objects_api.c ..\core\pbcc_actions_api.c ..\core\pubnub_actions_api.c ..\core\pubnub_memory_block.c ..\lib\pbstr_remove_from_list.c ..\windows\pb_sleep_ms.c ..\core\pbauto_heartbeat.c ..\windows\pbauto_heartbeat_init_windows.c
+SOURCEFILES = ..\core\pubnub_pubsubapi.c ..\core\pubnub_coreapi.c ..\core\pubnub_coreapi_ex.c ..\core\pubnub_ccore_pubsub.c ..\core\pubnub_ccore.c ..\core\pubnub_netcore.c ..\lib\sockets\pbpal_sockets.c ..\lib\sockets\pbpal_resolv_and_connect_sockets.c ..\lib\sockets\pbpal_handle_socket_error.c ..\core\pubnub_alloc_std.c ..\core\pubnub_assert_std.c ..\core\pubnub_generate_uuid.c ..\core\pubnub_timers.c ..\core\pubnub_blocking_io.c ..\lib\base64\pbbase64.c ..\core\pubnub_json_parse.c ..\core\pubnub_free_with_timeout_std.c ..\windows\pbtimespec_elapsed_ms.c ..\lib\md5\md5.c ..\lib\pb_strnlen_s.c ..\lib\pb_strncasecmp.c ..\core\pubnub_helper.c pubnub_version_windows.cpp ..\windows\pubnub_generate_uuid_windows.c ..\windows\pbpal_windows_blocking_io.c ..\windows\windows_socket_blocking_io.c ..\core\c99\snprintf.c ..\lib\miniz\miniz_tinfl.c ..\lib\miniz\miniz_tdef.c ..\lib\miniz\miniz.c ..\lib\pbcrc32.c ..\core\pbgzip_compress.c ..\core\pbgzip_decompress.c ..\core\pbcc_subscribe_v2.c ..\core\pubnub_subscribe_v2.c ..\windows\msstopwatch_windows.c ..\core\pubnub_url_encode.c ..\core\pbcc_advanced_history.c ..\core\pubnub_advanced_history.c ..\core\pbcc_objects_api.c ..\core\pubnub_objects_api.c ..\core\pbcc_actions_api.c ..\core\pubnub_actions_api.c ..\core\pubnub_memory_block.c ..\lib\pbstr_remove_from_list.c ..\windows\pb_sleep_ms.c ..\core\pbauto_heartbeat.c ..\windows\pbauto_heartbeat_init_windows.c
 
 LIBS=ws2_32.lib rpcrt4.lib
 
@@ -10,6 +10,10 @@ ONLY_PUBSUB_API = 0
 USE_PROXY = 1
 !endif
 
+!ifndef USE_REVOKE_TOKEN
+USE_REVOKE_TOKEN = 0
+!endif
+
 !ifndef USE_GRANT_TOKEN
 USE_GRANT_TOKEN = 0
 !endif
@@ -18,7 +22,7 @@ USE_GRANT_TOKEN = 0
 PROXY_INTF_SOURCEFILES = ..\core\pubnub_proxy.c ..\core\pubnub_proxy_core.c ..\core\pbhttp_digest.c ..\core\pbntlm_core.c ..\core\pbntlm_packer_sspi.c ..\windows\pubnub_set_proxy_from_system_windows.c 
 !endif
 
-CFLAGS = /EHsc /Zi /MP /TP /I .. /I . /I ..\core\c99 /I ..\windows /W3 /D PUBNUB_THREADSAFE /D HAVE_STRERROR_S /D PUBNUB_ONLY_PUBSUB_API=$(ONLY_PUBSUB_API) /D PUBNUB_PROXY_API=$(USE_PROXY) /D _CRT_SECURE_NO_WARNINGS /D _WINSOCK_DEPRECATED_NO_WARNINGS /D PUBNUB_USE_GRANT_TOKEN_API=$(USE_GRANT_TOKEN)
+CFLAGS = /EHsc /Zi /MP /TP /I .. /I . /I ..\core\c99 /I ..\windows /W3 /D PUBNUB_THREADSAFE /D HAVE_STRERROR_S /D PUBNUB_ONLY_PUBSUB_API=$(ONLY_PUBSUB_API) /D PUBNUB_PROXY_API=$(USE_PROXY) /D _CRT_SECURE_NO_WARNINGS /D _WINSOCK_DEPRECATED_NO_WARNINGS /D PUBNUB_USE_GRANT_TOKEN_API=$(USE_GRANT_TOKEN) /D PUBNUB_USE_REVOKE_TOKEN_API=$(USE_REVOKE_TOKEN)
 # /Zi enables debugging, remove to get a smaller .exe and no .pdb 
 # /MP uses one compiler (`cl`) process for each input file, enabling faster build
 # /TP means "compile all files as C++"

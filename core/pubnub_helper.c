@@ -54,6 +54,9 @@ char const* pubnub_res_2_string(enum pubnub_res e)
     case PNR_IO_ERROR: return "I/O (communication) error";
     case PNR_HTTP_ERROR: return "HTTP error received from server";
     case PNR_FORMAT_ERROR: return "Response format error";
+    case PNR_SUB_TT_FORMAT_ERROR: return "Subscribe Timetoken not in expected format";
+    case PNR_SUB_NO_TT_ERROR: return "No Timetoken in the subscribe response";
+    case PNR_SUB_NO_REG_ERROR: return "No Region in the subscribe response";
     case PNR_CANCELLED: return "Pubnub API transaction cancelled";
     case PNR_STARTED: return "Pubnub API transaction started";
     case PNR_IN_PROGRESS: return "Pubnub API transaction already in progress";
@@ -76,6 +79,9 @@ char const* pubnub_res_2_string(enum pubnub_res e)
     case PNR_ACTIONS_API_ERROR: return "Actions API transaction reported an error";
     case PNR_ACCESS_DENIED: return "Access/Permission denied";
     case PNR_GRANT_TOKEN_API_ERROR: return "Grant Token API reported error";
+    case PNR_FETCH_HISTORY_ERROR: return "Fetch History API reported error";
+    case PNR_REVOKE_TOKEN_API_ERROR: return "Revoke Token API reported error";
+    case PNR_GROUP_EMPTY: return "Channel Group is empty";
     default: return "!?!?!";
     }
 }
@@ -127,6 +133,10 @@ enum pubnub_tribool pubnub_should_retry(enum pubnub_res e)
     case PNR_ABORTED: return pbccNotSet;
     case PNR_IO_ERROR: return pbccNotSet;
     case PNR_HTTP_ERROR: return pbccFalse; /* For all known HTTP erros it doesn't make sense */
+    case PNR_SUB_TT_FORMAT_ERROR: return pbccFalse; /* Timetoken format error for Subscribe  */
+    case PNR_SUB_NO_TT_ERROR: return pbccFalse; /* No Timetoken error for Subscribe  */
+    case PNR_SUB_NO_REG_ERROR: return pbccFalse; /* No Region error for Subscribe  */
+    case PNR_GROUP_EMPTY: return pbccFalse; /* Empty ChannelGroup error for Subscribe  */
     case PNR_FORMAT_ERROR: return pbccFalse; /* Fix the format */
     case PNR_CANCELLED: return pbccFalse; /* User cancelled, what's the use? */
     case PNR_STARTED: return pbccFalse; /* We haven't finished yet! */
@@ -150,6 +160,18 @@ enum pubnub_tribool pubnub_should_retry(enum pubnub_res e)
     case PNR_ACTIONS_API_ERROR: return pbccFalse; /* Check the error reported */
     case PNR_ACCESS_DENIED: return pbccFalse; /* Permission issue. Check the error reported */
     case PNR_GRANT_TOKEN_API_ERROR: return pbccFalse; /* Check the error reported */
+    case PNR_FETCH_HISTORY_ERROR: return pbccFalse; /* Check the error reported */
+    case PNR_REVOKE_TOKEN_API_ERROR: return pbccFalse; /* Check the error reported */
+    default:
+        return pbccFalse;
     }
-    return pbccFalse;
+}
+
+char* replace_char(char* str, char find, char replace){
+    char *current_pos = strchr(str, find);
+    while (current_pos) {
+        *current_pos = replace;
+        current_pos = strchr(current_pos, find);
+    }
+    return str;
 }

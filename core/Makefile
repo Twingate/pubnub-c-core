@@ -1,4 +1,4 @@
-PROJECT_SOURCEFILES = pubnub_pubsubapi.c pubnub_coreapi.c pubnub_ccore_pubsub.c pubnub_ccore.c pubnub_netcore.c pubnub_alloc_static.c pubnub_assert_std.c pubnub_json_parse.c pubnub_keep_alive.c pubnub_helper.c pubnub_url_encode.c ../lib/pb_strnlen_s.c 
+PROJECT_SOURCEFILES = pubnub_pubsubapi.c pubnub_coreapi.c pubnub_ccore_pubsub.c pubnub_ccore.c pubnub_netcore.c pubnub_alloc_static.c pubnub_assert_std.c pubnub_json_parse.c pubnub_keep_alive.c pubnub_helper.c pubnub_url_encode.c ../lib/pb_strnlen_s.c ../lib/pb_strncasecmp.c  
 
 all: pubnub_proxy_unittest pubnub_timer_list_unittest unittest
 
@@ -26,12 +26,20 @@ ifndef USE_ADVANCED_HISTORY
 USE_ADVANCED_HISTORY = 1
 endif
 
+ifndef USE_FETCH_HISTORY
+USE_FETCH_HISTORY = 1
+endif
+
 ifeq ($(RECEIVE_GZIP_RESPONSE), 1)
 PROJECT_SOURCEFILES += ../lib/miniz/miniz_tinfl.c pbgzip_decompress.c
 endif
 
 ifeq ($(USE_ADVANCED_HISTORY), 1)
 PROJECT_SOURCEFILES += pbcc_advanced_history.c pubnub_advanced_history.c
+endif
+
+ifeq ($(USE_FETCH_HISTORY), 1)
+PROJECT_SOURCEFILES += pbcc_fetch_history.c pubnub_fetch_history.c
 endif
 
 CFLAGS +=-g -D PUBNUB_ADVANCED_KEEP_ALIVE=1 -D PUBNUB_LOG_LEVEL=PUBNUB_LOG_LEVEL_WARNING -D PUBNUB_DYNAMIC_REPLY_BUFFER=1 -D PUBNUB_RECEIVE_GZIP_RESPONSE=$(RECEIVE_GZIP_RESPONSE) -I. -I../ -I test -I../lib/base64 -I../lib/md5 -I../lib/miniz -I../cgreen/include

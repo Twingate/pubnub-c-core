@@ -6,7 +6,7 @@
 #include "pubnub_api_types.h"
 
 #include <stdbool.h>
-
+#include <stdint.h>
 
 /** @file pubnub_pubsubapi.h
     This is the "Pub/Sub" API of the Pubnub client library.
@@ -87,6 +87,24 @@ char const* pubnub_auth_get(pubnub_t* p);
     @retval #PN_CANCEL_STARTED cancel started, await the outcome
     @retval #PN_CANCEL_FINISHED cancelled, no need to await
 */
+
+/** Set the auth token information of PubNub client context @p
+    p. Pass NULL to unset.
+
+    @note The @p token is expected to be valid (ASCIIZ string) pointers
+    throughout the use of context @p pb, that is, until either you call
+    pubnub_done() on @p pb, or the otherwise stop using it (like when
+    the whole software/ firmware stops working). So, the contents of
+    the auth string is not copied to the Pubnub context @p pb.  */
+void pubnub_set_auth_token(pubnub_t* pb, const char* token);
+
+/** Returns the current auth token information for the
+    context @p pb.
+    After pubnub_init(), it will return `NULL` until you change it
+    to non-`NULL` via pubnub_set_auth_token().
+*/
+char const* pubnub_auth_token_get(pubnub_t* pb);
+
 enum pubnub_cancel_res pubnub_cancel(pubnub_t* p);
 
 /** Publish the @p message (in JSON format) on @p p channel, using the
@@ -290,6 +308,18 @@ char const* pubnub_get_origin(pubnub_t* p);
     @retval -1 setting origin not enabled
 */
 int pubnub_origin_set(pubnub_t* p, char const* origin);
+
+/** Sets the port to be used for the context @p p.  If setting of
+    the port is not enabled, this will fail.  It may also fail if it
+    detects an invalid port.
+
+    @param p Pubnub context to set the port for
+    @param origin The port to use for context @p p. 
+    @retval 0 port set,
+    @retval +1 port set will be applied with new connection,
+    @retval -1 setting port not enabled
+*/
+int pubnub_port_set(pubnub_t* p, uint16_t port);
 
 /** Enables the use of HTTP Keep-Alive ("persistent connections")
     on the context @p p.

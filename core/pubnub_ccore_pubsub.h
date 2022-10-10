@@ -33,11 +33,17 @@ struct pbcc_context {
     /** The `auth` parameter to be sent to server. If NULL, don't send
      * any */
     char const* auth;
+    /** The `auth_token` parameter to be sent to server. If NULL, don't send
+     * any */
+    char const* auth_token;
     /** Pointer to the message to send via POST method */
     char const* message_to_send;
 
     /** The last recived subscribe time token. */
     char timetoken[20];
+
+    /** Pointer to the presence state */
+    char const* state;
 
 #if PUBNUB_USE_SUBSCRIBE_V2
     /** The last received subscribe V2 region */
@@ -169,6 +175,14 @@ struct pbcc_context {
         }                                                                      \
     }
 
+#define APPEND_URL_ENCODED_M_TRANS(tr, pbc, what)                                        \
+    if ((what) != NULL) {                                                      \
+        enum pubnub_res rslt_ = pbcc_url_encode((pbc), (what), tr);     \
+        if (rslt_ != PNR_OK) {                                                 \
+            return rslt_;                                                      \
+        }                                                                      \
+    }
+
 #define APPEND_URL_PARAM_ENCODED_M(pbc, name, var, separator)                  \
     if ((var) != NULL) {                                                       \
         const char* param_ = name;                                             \
@@ -263,7 +277,9 @@ struct pbcc_context {
     struct name##_data name[(size)];                                           \
     memset(&name, 0, sizeof(struct name##_data) * (size));                     \
     char name##_index = 0;                                                     \
-    int name##_count = 0;
+    int name##_count = 0;                                                      \
+    char name##_val_str[21];                                                   \
+    (void)name##_val_str;
 
 #define ADD_URL_PARAM(name, key, value)                                     \
     name[(int)(name##_index)].param_key = #key;                             \
@@ -271,17 +287,20 @@ struct pbcc_context {
     name[(int)(name##_index)].param_val = value;                            \
     (int)(name##_index)++;
 
+#define ADD_URL_AUTH_PARAM(pb, name, key)                                     \
+        if (pb->auth_token != NULL) { ADD_URL_PARAM(name, key, pb->auth_token); } \
+        else if (pb->auth != NULL) { ADD_URL_PARAM(name, key, pb->auth); }        
+
 #define ADD_URL_PARAM_SIZET(name, key, value)                               \
     int val_len = snprintf(NULL, 0, "%lu", value);                          \
-    char val_str[21];                                                       \
     if (val_len >= 21) {                                                    \
         PUBNUB_LOG_ERROR("Error: in ADD_URL_PARAM_SIZET:\n");               \
         return PNR_TX_BUFF_TOO_SMALL;                                       \
     }                                                                       \
-    snprintf(val_str, val_len + 1, "%lu", value);                           \
+    snprintf(name##_val_str, val_len + 1, "%lu", value);                    \
     name[(int)(name##_index)].param_key = #key;                             \
     name[(int)(name##_index)].key_size = sizeof(#key)-1;                    \
-    name[(int)(name##_index)].param_val = val_str;                          \
+    name[(int)(name##_index)].param_val = name##_val_str;                   \
     (int)(name##_index)++;
 
 #define ADD_URL_PARAM_TRUE_KEY(name, key, value)                          \
@@ -292,8 +311,8 @@ struct pbcc_context {
 
 #define ADD_TS_TO_URL_PARAM()                                               \
     time_t epoch_time = time(NULL);                                         \
+    char timestamp[16];                                                     \
     if (epoch_time > 0) {                                                   \
-        char timestamp[16];                                                 \
         sprintf(timestamp, "%lld", (long long)epoch_time);                  \
         ADD_URL_PARAM(qparam, timestamp, timestamp);                        \
     }
@@ -376,6 +395,9 @@ char const* pbcc_uuid_get(struct pbcc_context* pb);
 
 /** Sets the `auth` for the context */
 void pbcc_set_auth(struct pbcc_context* pb, const char* auth);
+
+/** Sets the `auth` for the context */
+void pbcc_set_auth_token(struct pbcc_context* pb, const char* token);
 
 /** Response parser function prototype */
 typedef enum pubnub_res (*PFpbcc_parse_response_T)(struct pbcc_context*);

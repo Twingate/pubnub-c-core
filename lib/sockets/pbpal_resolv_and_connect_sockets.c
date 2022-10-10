@@ -48,12 +48,19 @@ static void prepare_port_and_hostname(pubnub_t*    pb,
 {
     PUBNUB_ASSERT(pb_valid_ctx_ptr(pb));
     PUBNUB_ASSERT_OPT((pb->state == PBS_READY) || (pb->state == PBS_WAIT_DNS_SEND));
-    *p_origin = PUBNUB_ORIGIN_SETTABLE ? pb->origin : PUBNUB_ORIGIN;
+    *p_origin = PUBNUB_ORIGIN;
+    *p_port = HTTP_PORT;
 #if PUBNUB_USE_SSL
     if (pb->flags.trySSL) {
         PUBNUB_ASSERT(pb->options.useSSL);
         *p_port = TLS_PORT;
     }
+#endif
+#if PUBNUB_ORIGIN_SETTABLE
+    if (pb->port != INITIAL_PORT_VALUE) {
+        *p_port = pb->port;
+    }
+    *p_origin = pb->origin;
 #endif
 #if PUBNUB_PROXY_API
     switch (pb->proxy_type) {
@@ -77,6 +84,13 @@ static void prepare_port_and_hostname(pubnub_t*    pb,
 
 
 #ifdef PUBNUB_CALLBACK_API
+
+static void get_default_dns_ip(struct pubnub_ipv4_address *addr) {
+    if (pubnub_dns_read_system_servers_ipv4(addr, 1) != 1) {
+        inet_pton(AF_INET, PUBNUB_DEFAULT_DNS_SERVER, addr);
+    }
+}
+
 #if PUBNUB_SET_DNS_SERVERS
 #if PUBNUB_CHANGE_DNS_SERVERS
 static void get_dns_ip(struct pbdns_servers_check* dns_check, struct sockaddr* addr)
@@ -97,7 +111,7 @@ static void get_dns_ip(struct pbdns_servers_check* dns_check, struct sockaddr* a
 #if PUBNUB_USE_IPV6
             addr->sa_family = AF_INET6;
 #else
-            inet_pton(AF_INET, PUBNUB_DEFAULT_DNS_SERVER, p);
+            get_default_dns_ip((struct pubnub_ipv4_address*)p);
 #endif /* PUBNUB_USE_IPV6 */
         }
     }
@@ -112,7 +126,7 @@ static void get_dns_ip(struct pbdns_servers_check* dns_check, struct sockaddr* a
                 || (dns_check->dns_server_check & dns_check->dns_mask)) {
                 dns_check->dns_mask <<= 1;
                 addr->sa_family = AF_INET;
-                inet_pton(AF_INET, PUBNUB_DEFAULT_DNS_SERVER, p);
+                get_default_dns_ip((struct pubnub_ipv4_address*)p);
             }
         }
     }
@@ -132,7 +146,7 @@ static void get_dns_ip(struct sockaddr* addr)
 #if PUBNUB_USE_IPV6
         addr->sa_family = AF_INET6;
 #else
-        inet_pton(AF_INET, PUBNUB_DEFAULT_DNS_SERVER, p);
+        get_default_dns_ip((struct pubnub_ipv4_address*)p);
 #endif /* PUBNUB_USE_IPV6 */
     }
     if (AF_INET6 == addr->sa_family) {
@@ -141,7 +155,7 @@ static void get_dns_ip(struct sockaddr* addr)
             && (pubnub_get_dns_secondary_server_ipv6((struct pubnub_ipv6_address*)pv6)
                 == -1)) {
             addr->sa_family = AF_INET;
-            inet_pton(AF_INET, PUBNUB_DEFAULT_DNS_SERVER, p);
+            get_default_dns_ip((struct pubnub_ipv4_address*)p);
         }
     }
 }
@@ -150,9 +164,8 @@ static void get_dns_ip(struct sockaddr* addr)
 static void get_dns_ip(struct sockaddr* addr)
 {
     addr->sa_family = AF_INET;
-    inet_pton(AF_INET,
-              PUBNUB_DEFAULT_DNS_SERVER,
-              &(((struct sockaddr_in*)addr)->sin_addr.s_addr));
+    struct pubnub_ipv4_address* p = (struct pubnub_ipv4_address*)&(((struct sockaddr_in*)addr)->sin_addr.s_addr);
+    get_default_dns_ip(p);
 }
 #endif /* PUBNUB_SET_DNS_SERVERS */
 

@@ -1,6 +1,8 @@
 /* -*- c-file-style:"stroustrup"; indent-tabs-mode: nil -*- */
 #include "pubnub_internal.h"
 
+#include "lib/pb_strncasecmp.h"
+
 #include "core/pubnub_assert.h"
 #include "core/pubnub_log.h"
 #include "core/pubnub_ccore.h"
@@ -15,6 +17,9 @@
 #if PUBNUB_USE_ADVANCED_HISTORY
 #include "core/pbcc_advanced_history.h"
 #endif
+#if PUBNUB_USE_FETCH_HISTORY
+#include "core/pbcc_fetch_history.h"
+#endif
 #if PUBNUB_USE_OBJECTS_API
 #include "core/pbcc_objects_api.h"
 #endif
@@ -23,6 +28,9 @@
 #endif
 #if PUBNUB_USE_GRANT_TOKEN_API
 #include "core/pbcc_grant_token_api.h"
+#endif
+#if PUBNUB_USE_REVOKE_TOKEN_API
+#include "core/pbcc_revoke_token_api.h"
 #endif
 #include "core/pubnub_proxy_core.h"
 
@@ -315,6 +323,12 @@ static PFpbcc_parse_response_T m_aParseResponse[] = { dont_parse,
 #if PUBNUB_USE_GRANT_TOKEN_API
     , pbcc_parse_grant_token_api_response /* PBTT_GRANT_TOKEN */
 #endif /* PUBNUB_USE_GRANT_TOKEN_API */
+#if PUBNUB_USE_FETCH_HISTORY
+    , pbcc_parse_fetch_history_response /* PBTT_FETCH_HISTORY */
+#endif
+#if PUBNUB_USE_REVOKE_TOKEN_API
+    , pbcc_parse_revoke_token_response /* PBTT_REVOKE_TOKEN */
+#endif /* PUBNUB_USE_REVOKE_TOKEN_API */
 #endif /* PUBNUB_ONLY_PUBSUB_API */
 };
 
@@ -1118,10 +1132,10 @@ next_state:
                 }
                 goto next_state;
             }
-            if (strncmp(pb->core.http_buf, h_chunked, sizeof h_chunked - 1) == 0) {
+            if (pb_strncasecmp(pb->core.http_buf, h_chunked, sizeof h_chunked - 1) == 0) {
                 pb->http_chunked = true;
             }
-            else if (strncmp(pb->core.http_buf, h_length, sizeof h_length - 1) == 0) {
+            else if (pb_strncasecmp(pb->core.http_buf, h_length, sizeof h_length - 1) == 0) {
                 size_t len = atoi(pb->core.http_buf + sizeof h_length - 1);
                 if (0 != pbcc_realloc_reply_buffer(&pb->core, len)) {
                     outcome_detected(pb, PNR_REPLY_TOO_BIG);
@@ -1129,11 +1143,11 @@ next_state:
                 }
                 pb->core.http_content_len = len;
             }
-            else if (strncmp(pb->core.http_buf, h_close, sizeof h_close - 1) == 0) {
+            else if (pb_strncasecmp(pb->core.http_buf, h_close, sizeof h_close - 1) == 0) {
                 pb->flags.should_close = true;
             }
 #if PUBNUB_RECEIVE_GZIP_RESPONSE
-            else if (strncmp(pb->core.http_buf, h_encoding, sizeof h_encoding - 1)
+            else if (pb_strncasecmp(pb->core.http_buf, h_encoding, sizeof h_encoding - 1)
                      == 0) {
                 pb->data_compressed = compressionGZIP;
             }

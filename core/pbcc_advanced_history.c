@@ -249,11 +249,13 @@ int pbcc_get_message_counts(struct pbcc_context* p, char const* channel, int* o_
         ch_end = (char*)pbjson_find_end_element(ch_start++, end);
         len = ch_end - ch_start;
         for (i = 0; i < n ; i++) {
-            ptr_ch = channel - o_count[i] - 1;
-            /* Comparing channel name found in response message with name from 'channel' list. */
-            if ((memcmp(ptr_ch, ch_start, len) == 0) &&
-                ((' ' == *(ptr_ch + len)) || (',' == *(ptr_ch + len)) || ('\0' == *(ptr_ch + len)))) {
-                break;
+            if (o_count[i] < 0) {
+                ptr_ch = channel - o_count[i] - 1;
+                /* Comparing channel name found in response message with name from 'channel' list. */
+                if ((memcmp(ptr_ch, ch_start, len) == 0) &&
+                    ((' ' == *(ptr_ch + len)) || (',' == *(ptr_ch + len)) || ('\0' == *(ptr_ch + len)))) {
+                    break;
+                }
             }
         }
         if (i == n) {
@@ -515,10 +517,10 @@ enum pubnub_res pbcc_message_counts_prep(
     if (uname) { ADD_URL_PARAM(qparam, pnsdk, uname); }
     if (uuid) { ADD_URL_PARAM(qparam, uuid, uuid); }
 #if PUBNUB_CRYPTO_API
-    if (p->secret_key == NULL && p->auth != NULL) { ADD_URL_PARAM(qparam, auth, p->auth); }
+    if (p->secret_key == NULL) { ADD_URL_AUTH_PARAM(p, qparam, auth); }
     ADD_TS_TO_URL_PARAM();
 #else
-    if (p->auth != NULL) { ADD_URL_PARAM(qparam, auth, p->auth); }
+    ADD_URL_AUTH_PARAM(p, qparam, auth);
 #endif
     if (timetoken) { ADD_URL_PARAM(qparam, timetoken, timetoken); }
     if (channel_timetokens) { ADD_URL_PARAM(qparam, channelsTimetoken, channel_timetokens); }
@@ -536,5 +538,6 @@ enum pubnub_res pbcc_message_counts_prep(
     }
 #endif
 
+    PUBNUB_LOG_DEBUG("pbcc_message_counts_prep. REQUEST =%s\n", p->http_buf);
     return (rslt != PNR_OK) ? rslt : PNR_STARTED;
 }

@@ -1,4 +1,4 @@
-SOURCEFILES = ../core/pubnub_pubsubapi.c ../core/pubnub_coreapi.c ../core/pubnub_coreapi_ex.c ../core/pubnub_ccore_pubsub.c ../core/pubnub_ccore.c ../core/pubnub_netcore.c  ../lib/sockets/pbpal_sockets.c ../lib/sockets/pbpal_resolv_and_connect_sockets.c ../lib/sockets/pbpal_handle_socket_error.c ../core/pubnub_alloc_std.c ../core/pubnub_assert_std.c ../core/pubnub_generate_uuid.c ../core/pubnub_blocking_io.c ../posix/posix_socket_blocking_io.c ../core/pubnub_timers.c ../core/pubnub_json_parse.c ../lib/md5/md5.c ../lib/base64/pbbase64.c ../lib/pb_strnlen_s.c ../core/pubnub_helper.c pubnub_version_posix.cpp ../posix/pubnub_generate_uuid_posix.c ../posix/pbpal_posix_blocking_io.c ../core/pubnub_free_with_timeout_std.c pubnub_subloop.cpp ../posix/msstopwatch_monotonic_clock.c ../posix/pbtimespec_elapsed_ms.c ../core/pubnub_url_encode.c ../core/pubnub_memory_block.c ../posix/pb_sleep_ms.c
+SOURCEFILES = ../core/pubnub_pubsubapi.c ../core/pubnub_coreapi.c ../core/pubnub_coreapi_ex.c ../core/pubnub_ccore_pubsub.c ../core/pubnub_ccore.c ../core/pubnub_netcore.c  ../lib/sockets/pbpal_sockets.c ../lib/sockets/pbpal_resolv_and_connect_sockets.c ../lib/sockets/pbpal_handle_socket_error.c ../core/pubnub_alloc_std.c ../core/pubnub_assert_std.c ../core/pubnub_generate_uuid.c ../core/pubnub_blocking_io.c ../posix/posix_socket_blocking_io.c ../core/pubnub_timers.c ../core/pubnub_json_parse.c ../lib/md5/md5.c ../lib/base64/pbbase64.c ../lib/pb_strnlen_s.c ../lib/pb_strncasecmp.c ../core/pubnub_helper.c pubnub_version_posix.cpp ../posix/pubnub_generate_uuid_posix.c ../posix/pbpal_posix_blocking_io.c ../core/pubnub_free_with_timeout_std.c pubnub_subloop.cpp ../posix/msstopwatch_monotonic_clock.c ../posix/pbtimespec_elapsed_ms.c ../core/pubnub_url_encode.c ../core/pubnub_memory_block.c ../posix/pb_sleep_ms.c
 
 ifndef ONLY_PUBSUB_API
 ONLY_PUBSUB_API = 0
@@ -36,8 +36,16 @@ ifndef USE_AUTO_HEARTBEAT
 USE_AUTO_HEARTBEAT = 1
 endif
 
+ifndef USE_REVOKE_TOKEN
+USE_REVOKE_TOKEN = 0
+endif
+
 ifndef USE_GRANT_TOKEN
 USE_GRANT_TOKEN = 0
+endif
+
+ifndef USE_FETCH_HISTORY
+USE_FETCH_HISTORY = 1
 endif
 
 ifeq ($(USE_PROXY), 1)
@@ -72,6 +80,10 @@ ifeq ($(USE_AUTO_HEARTBEAT), 1)
 SOURCEFILES += ../core/pbauto_heartbeat.c ../posix/pbauto_heartbeat_init_posix.c ../lib/pbstr_remove_from_list.c
 endif
 
+ifeq ($(USE_FETCH_HISTORY), 1)
+SOURCEFILES += ../core/pubnub_fetch_history.c ../core/pbcc_fetch_history.c  
+endif
+
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
 SOURCEFILES += ../posix/monotonic_clock_get_time_darwin.c
@@ -81,7 +93,7 @@ SOURCEFILES += ../posix/monotonic_clock_get_time_posix.c
 LDLIBS=-lrt -lpthread
 endif
 
-CFLAGS =-g -I .. -I ../posix -I . -Wall -D PUBNUB_THREADSAFE -D PUBNUB_LOG_LEVEL=PUBNUB_LOG_LEVEL_WARNING -D PUBNUB_ONLY_PUBSUB_API=$(ONLY_PUBSUB_API) -D PUBNUB_PROXY_API=$(USE_PROXY) -D PUBNUB_USE_GZIP_COMPRESSION=$(USE_GZIP_COMPRESSION) -D PUBNUB_RECEIVE_GZIP_RESPONSE=$(RECEIVE_GZIP_RESPONSE) -D PUBNUB_USE_SUBSCRIBE_V2=$(USE_SUBSCRIBE_V2) -D PUBNUB_USE_OBJECTS_API=$(USE_OBJECTS_API) -D PUBNUB_USE_ACTIONS_API=$(USE_ACTIONS_API) -D PUBNUB_USE_AUTO_HEARTBEAT=$(USE_AUTO_HEARTBEAT) -D PUBNUB_USE_GRANT_TOKEN_API=$(USE_GRANT_TOKEN)
+CFLAGS =-g -I .. -I ../posix -I . -Wall -D PUBNUB_THREADSAFE -D PUBNUB_LOG_LEVEL=PUBNUB_LOG_LEVEL_WARNING -D PUBNUB_ONLY_PUBSUB_API=$(ONLY_PUBSUB_API) -D PUBNUB_PROXY_API=$(USE_PROXY) -D PUBNUB_USE_GZIP_COMPRESSION=$(USE_GZIP_COMPRESSION) -D PUBNUB_RECEIVE_GZIP_RESPONSE=$(RECEIVE_GZIP_RESPONSE) -D PUBNUB_USE_SUBSCRIBE_V2=$(USE_SUBSCRIBE_V2) -D PUBNUB_USE_OBJECTS_API=$(USE_OBJECTS_API) -D PUBNUB_USE_ACTIONS_API=$(USE_ACTIONS_API) -D PUBNUB_USE_AUTO_HEARTBEAT=$(USE_AUTO_HEARTBEAT) -D PUBNUB_USE_GRANT_TOKEN_API=$(USE_GRANT_TOKEN) -D PUBNUB_USE_REVOKE_TOKEN_API=$(USE_REVOKE_TOKEN) -D PUBNUB_USE_FETCH_HISTORY=$(USE_FETCH_HISTORY)
 # -g enables debugging, remove to get a smaller executable
 
 

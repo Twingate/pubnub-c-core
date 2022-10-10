@@ -32,3 +32,9 @@
 *.dSYM/
 *.pdb
 *.ilk
+
+# GitHub Actions #
+##################
+.github/.release
+
+.idea

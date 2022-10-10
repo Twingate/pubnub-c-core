@@ -6,12 +6,21 @@
 #include "pubnub_api_types.h"
 
 #include <stdbool.h>
+#include "lib/cbor/cbor.h"
 
-int pubnub_get_grant_bit_mask_value(bool read, 
-                                  bool write, 
-                                  bool manage, 
-                                  bool del, 
-                                  bool create);
+struct pam_permission{
+    bool read;
+    bool write;
+    bool manage;
+    bool del;
+    bool create;
+    bool get;
+    bool update;
+    bool join;
+};
+
+int pubnub_get_grant_bit_mask_value(struct pam_permission pam);
+
 
 /** Returns the token for a set of permissions specified in @p perm_obj.
     An example for @perm_obj:
@@ -21,12 +30,14 @@ int pubnub_get_grant_bit_mask_value(bool read,
           "resources":{
             "channels":{ "mych":31 },
             "groups":{ "mycg":31 },
+            "uuids":{ "myuuid":31 },
             "users":{ "myuser":31 },
             "spaces":{ "myspc":31 }
           },
           "patterns":{
             "channels":{ },
             "groups":{ },
+            "uuids":{ "^$":1 },
             "users":{ "^$":1 },
             "spaces":{ "^$":1 }
           },
@@ -41,5 +52,7 @@ int pubnub_get_grant_bit_mask_value(bool read,
 enum pubnub_res pubnub_grant_token(pubnub_t* pb, char const* perm_obj);
 
 pubnub_chamebl_t pubnub_get_grant_token(pubnub_t* pb);
+
+char* pubnub_parse_token(pubnub_t* pb, char const* token);
 
 #endif /* !defined INC_PUBNUB_GRANT_TOKEN_API */
