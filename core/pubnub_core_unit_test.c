@@ -1,11 +1,15 @@
 /* -*- c-file-style:"stroustrup"; indent-tabs-mode: nil -*- */
 #include "cgreen/cgreen.h"
 #include "cgreen/mocks.h"
+#include "test/pubnub_test_mocks.h"
 
+#include "lib/pb_deprecated.h"
 #include "pubnub_internal.h"
 #include "pubnub_server_limits.h"
 #include "pubnub_pubsubapi.h"
 #include "pubnub_coreapi.h"
+// TODO: move coreapi_ex to new module
+#include "pubnub_coreapi_ex.h"
 #if PUBNUB_USE_ADVANCED_HISTORY
 #include "pubnub_memory_block.h"
 #include "pubnub_advanced_history.h"
@@ -39,483 +43,6 @@
 #define sets(par, val) will_set_contents_of_parameter(par, &(val), sizeof(val))
 #define sets_ex will_set_contents_of_parameter
 #define returns will_return
-
-struct uint8_block {
-    size_t   size;
-    uint8_t* block;
-};
-
-/* Current (simulated) string message received */
-static const char* m_read;
-/* Number of simulated string messages received */
-static int m_num_string_msgs_rcvd;
-/* Number of 'uint8_t' data blocks received*/
-static int m_num_uint8_data_blocks;
-/* Array of simulated 'receive' messages */
-static char* m_string_msg_array[20];
-/* Array of simulated 'receive' messages */
-static struct uint8_block* m_uint8_data_block_array[20];
-/* Index(in the array) of the current string message used while receiving*/
-static int m_i;
-/* Index(in the array) of the current 'uint8_t' data block used while
- * receiving*/
-static int m_j;
-/* bit masks array for advancing through string or uint8blocks arrays while
- * receiving */
-uint8_t string_or_uint8block_mask[10];
-
-/* Awaits given amount of time in seconds */
-static void wait_time_in_seconds(time_t time_in_seconds)
-{
-    time_t time_start = time(NULL);
-    do {
-    } while ((time(NULL) - time_start) < time_in_seconds);
-    return;
-}
-
-
-/* The Pubnub NTF mocks and stubs */
-void pbntf_trans_outcome(pubnub_t* pb, enum pubnub_state state)
-{
-    pb->state = state;
-    mock(pb);
-}
-
-int pbntf_got_socket(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-
-void pbntf_lost_socket(pubnub_t* pb)
-{
-    mock(pb);
-}
-
-void pbntf_update_socket(pubnub_t* pb)
-{
-    mock(pb);
-}
-
-void pbntf_start_wait_connect_timer(pubnub_t* pb)
-{
-    /* This might be mocked at some point */
-}
-
-void pbntf_start_transaction_timer(pubnub_t* pb)
-{
-    /* This might be mocked at some point */
-}
-
-int pbntf_requeue_for_processing(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-
-int pbntf_enqueue_for_processing(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-
-int pbntf_watch_out_events(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-
-int pbntf_watch_in_events(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-
-
-/* The Pubnub PAL mocks and stubs */
-
-static void buf_setup(pubnub_t* pb)
-{
-    pb->ptr  = (uint8_t*)pb->core.http_buf;
-    pb->left = sizeof pb->core.http_buf / sizeof pb->core.http_buf[0];
-}
-
-void pbpal_init(pubnub_t* pb)
-{
-    buf_setup(pb);
-}
-
-enum pbpal_resolv_n_connect_result pbpal_resolv_and_connect(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-enum pbpal_resolv_n_connect_result pbpal_check_resolv_and_connect(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-
-#if defined(PUBNUB_CALLBACK_API)
-#if PUBNUB_CHANGE_DNS_SERVERS
-int pbpal_dns_rotate_server(pubnub_t *pb)
-{
-    return (int)mock(pb);
-}
-#endif /* PUBNUB_CHANGE_DNS_SERVERS */
-#endif /* defined(PUBNUB_CALLBACK_API) */
-
-bool pbpal_connected(pubnub_t* pb)
-{
-    return (bool)mock(pb);
-}
-
-void pbpal_free(pubnub_t* pb)
-{
-    mock(pb);
-}
-
-enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
-{
-    return (int)mock(pb);
-}
-
-void pbpal_report_error_from_environment(pubnub_t* pb, char const* file, int line)
-{
-    mock(pb);
-}
-
-#if 0
-#include <execinfo.h>
-static void my_stack_trace(void)
-{
-    void *trace[16];
-    char **messages = NULL;
-    int i, trace_size = 0;
-
-    trace_size = backtrace(trace, sizeof trace / sizeof trace[0]);
-    messages = backtrace_symbols(trace, trace_size);
-    for (i = 1; i < trace_size; ++i) {
-        printf("[bt] #%d %s \n", i, messages[i]);
-        /* find first occurence of '(' or ' ' in message[i] and assume
-         * everything before that is the file name. (Don't go beyond 0 though
-         * (string terminator)*/
-        size_t p = 0;
-        while(messages[i][p] != '(' && messages[i][p] != ' '
-              && messages[i][p] != 0)
-            ++p;
-
-        char syscom[256];
-        snprintf(syscom, sizeof syscom, "addr2line %p -e %.*s", trace[i], p, messages[i]);
-        //last parameter is the file name of the symbol
-        system(syscom);
-    }
-}
-#endif
-
-
-int pbpal_send(pubnub_t* pb, void const* data, size_t n)
-{
-    return (int)mock(pb, data, n);
-}
-
-int pbpal_send_str(pubnub_t* pb, char const* s)
-{
-    return (int)mock(pb, s);
-}
-
-
-int pbpal_send_status(pubnub_t* pb)
-{
-    return (bool)mock(pb);
-}
-
-int pbpal_start_read_line(pubnub_t* pb)
-{
-    unsigned distance;
-
-    PUBNUB_ASSERT_INT_OPT(pb->sock_state, ==, STATE_NONE);
-
-    if (pb->unreadlen > 0) {
-        PUBNUB_ASSERT_OPT((char*)(pb->ptr + pb->unreadlen)
-                          <= (char*)(pb->core.http_buf + PUBNUB_BUF_MAXLEN));
-        memmove(pb->core.http_buf, pb->ptr, pb->unreadlen);
-    }
-    distance = pb->ptr - (uint8_t*)pb->core.http_buf;
-    PUBNUB_ASSERT_UINT((distance + pb->left + pb->unreadlen),
-                       ==,
-                       (sizeof pb->core.http_buf / sizeof pb->core.http_buf[0]));
-    pb->ptr -= distance;
-    pb->left += distance;
-
-    pb->sock_state = STATE_READ_LINE;
-
-    return +1;
-}
-
-int pbpal_read_len(pubnub_t* pb)
-{
-    return (char*)pb->ptr - pb->core.http_buf;
-}
-
-
-static int my_recv(void* p, size_t n)
-{
-    static short m_new = 1;
-    int          to_read;
-    if (string_or_uint8block_mask[(m_i + m_j) / 8] & (1 << (m_i + m_j) % 8)) {
-        if (m_new) {
-            assert(m_num_string_msgs_rcvd <= sizeof m_string_msg_array);
-            if (m_i < m_num_string_msgs_rcvd) {
-                m_read = m_string_msg_array[m_i];
-                m_new  = 0;
-                assert(m_read != NULL);
-                if (strlen(m_read) == 0) {
-                    /* an empty string sent(server response simulation),
-                     * through function 'incoming',
-                     * 'APIs' should interpret as:
-                     * ('recv_from_platform_result' < 0) which gives
-                     * the oportunity to simulate and test
-                     * 'callback' environment in some degree.
-                     */
-                    ++m_i;
-                    m_new = 1;
-                    return -1;
-                }
-            }
-            else {
-                /* If there is no more 'incoming' string msgs when expected
-                 * virtual platform simulates 'connection closed - server
-                 * side'(0 bytes received)
-                 */
-                m_new = 1;
-                return 0;
-            }
-        }
-        assert(m_read != NULL);
-        to_read = strlen(m_read);
-        if (to_read > n) {
-            to_read = n;
-        }
-        if (strlen(m_read) == to_read) {
-            ++m_i;
-            m_new = 1;
-        }
-    }
-    else {
-        if (m_new) {
-            assert(m_num_uint8_data_blocks <= sizeof m_uint8_data_block_array);
-            if (m_j < m_num_uint8_data_blocks) {
-                m_read = (const char*)m_uint8_data_block_array[m_j]->block;
-                m_new  = 0;
-            }
-            else {
-                /* If there is no more 'incoming' 'uint8_t' data blocks when
-                 * expected virtual platform simulates 'connection closed -
-                 * server side'(0 bytes received)
-                 */
-                m_new = 1;
-                return 0;
-            }
-        }
-        assert(m_read != NULL);
-        to_read = m_uint8_data_block_array[m_j]->size;
-        if (to_read > n) {
-            to_read = n;
-        }
-        if (!(m_uint8_data_block_array[m_j]->size -= to_read)) {
-            ++m_j;
-            m_new = 1;
-        }
-    }
-    memcpy(p, m_read, to_read);
-    m_read += to_read;
-    return to_read;
-}
-
-enum pubnub_res pbpal_line_read_status(pubnub_t* pb)
-{
-    uint8_t c;
-
-    PUBNUB_ASSERT_OPT(STATE_READ_LINE == pb->sock_state);
-
-    if (pb->unreadlen == 0) {
-        int recvres;
-        PUBNUB_ASSERT_OPT((char*)(pb->ptr + pb->left)
-                          == (char*)(pb->core.http_buf + PUBNUB_BUF_MAXLEN));
-        recvres = my_recv((char*)pb->ptr, pb->left);
-        if (recvres < 0) {
-            return PNR_IN_PROGRESS;
-        }
-        else if (0 == recvres) {
-            pb->sock_state = STATE_NONE;
-            return PNR_TIMEOUT;
-        }
-        PUBNUB_ASSERT_OPT(recvres <= pb->left);
-        PUBNUB_LOG_TRACE(
-            "pb=%p have new data of length=%d: %.*s\n", pb, recvres, recvres, pb->ptr);
-        pb->unreadlen = recvres;
-        pb->left -= recvres;
-    }
-
-    while (pb->unreadlen > 0) {
-        --pb->unreadlen;
-
-        c = *pb->ptr++;
-        if (c == '\n') {
-            PUBNUB_LOG_TRACE("pb=%p, newline found, line length: %d, ",
-                             pb,
-                             pbpal_read_len(pb));
-            WATCH_USHORT(pb->unreadlen);
-            pb->sock_state = STATE_NONE;
-            return PNR_OK;
-        }
-    }
-
-    if (pb->left == 0) {
-        PUBNUB_LOG_ERROR(
-            "pbpal_line_read_status(pb=%p): buffer full but newline not found", pb);
-        pb->sock_state = STATE_NONE;
-        return PNR_TX_BUFF_TOO_SMALL;
-    }
-
-    return PNR_IN_PROGRESS;
-}
-
-int pbpal_start_read(pubnub_t* pb, size_t n)
-{
-    unsigned distance;
-
-    PUBNUB_ASSERT_UINT_OPT(n, >, 0);
-    PUBNUB_ASSERT_INT_OPT(pb->sock_state, ==, STATE_NONE);
-
-    WATCH_USHORT(pb->unreadlen);
-    WATCH_USHORT(pb->left);
-    if (pb->unreadlen > 0) {
-        PUBNUB_ASSERT_OPT((char*)(pb->ptr + pb->unreadlen)
-                          <= (char*)(pb->core.http_buf + PUBNUB_BUF_MAXLEN));
-        memmove(pb->core.http_buf, pb->ptr, pb->unreadlen);
-    }
-    distance = pb->ptr - (uint8_t*)pb->core.http_buf;
-    WATCH_UINT(distance);
-    PUBNUB_ASSERT_UINT(distance + pb->unreadlen + pb->left,
-                       ==,
-                       sizeof pb->core.http_buf / sizeof pb->core.http_buf[0]);
-    pb->ptr -= distance;
-    pb->left += distance;
-
-    pb->sock_state = STATE_READ;
-    pb->len        = n;
-
-    return +1;
-}
-
-enum pubnub_res pbpal_read_status(pubnub_t* pb)
-{
-    int have_read;
-
-    PUBNUB_ASSERT_OPT(STATE_READ == pb->sock_state);
-
-    if (0 == pb->unreadlen) {
-        unsigned to_recv = pb->len;
-        if (to_recv > pb->left) {
-            to_recv = pb->left;
-        }
-        PUBNUB_ASSERT_OPT(to_recv > 0);
-        have_read = my_recv((char*)pb->ptr, to_recv);
-        if (have_read < 0) {
-            return PNR_IN_PROGRESS;
-        }
-        else if (0 == have_read) {
-            pb->sock_state = STATE_NONE;
-            return PNR_TIMEOUT;
-        }
-        PUBNUB_ASSERT_OPT(pb->left >= have_read);
-        pb->left -= have_read;
-    }
-    else {
-        have_read = (pb->unreadlen >= pb->len) ? pb->len : pb->unreadlen;
-        pb->unreadlen -= have_read;
-    }
-
-    pb->len -= have_read;
-    pb->ptr += have_read;
-
-    if ((0 == pb->len) || (0 == pb->left)) {
-        pb->sock_state = STATE_NONE;
-        return PNR_OK;
-    }
-
-    return PNR_IN_PROGRESS;
-}
-
-
-bool pbpal_closed(pubnub_t* pb)
-{
-    return (bool)mock(pb);
-}
-
-void pbpal_forget(pubnub_t* pb)
-{
-    mock(pb);
-}
-
-int pbpal_close(pubnub_t* pb)
-{
-    pb->sock_state = STATE_NONE;
-    return mock(pb);
-}
-
-
-/* The Pubnub version stubs */
-
-char const* pubnub_sdk_name(void)
-{
-    return "unit-test";
-}
-
-char const* pubnub_version(void)
-{
-    return "0.1";
-}
-
-char const* pubnub_uname(void)
-{
-    return "unit-test-0.1";
-}
-
-char const* pubnub_uagent(void)
-{
-    return "POSIX-PubNub-C-core/" PUBNUB_SDK_VERSION;
-}
-
-
-/* Assert "catching" */
-static bool        m_expect_assert;
-static jmp_buf     m_assert_exp_jmpbuf;
-static char const* m_expect_assert_file;
-
-
-void assert_handler(char const* s, const char* file, long i)
-{
-    printf("%s:%ld: Pubnub assert failed '%s'\n", file, i, s);
-}
-
-void test_assert_handler(char const* s, const char* file, long i)
-{
-    //    mock(s, i);
-    printf("%s:%ld: Pubnub assert failed '%s'\n", file, i, s);
-
-    attest(m_expect_assert);
-    attest(m_expect_assert_file, streqs(file));
-    if (m_expect_assert) {
-        m_expect_assert = false;
-        longjmp(m_assert_exp_jmpbuf, 1);
-    }
-}
-
-#define expect_assert_in(expr, file)                                           \
-    {                                                                          \
-        m_expect_assert      = true;                                           \
-        m_expect_assert_file = file;                                           \
-        int val              = setjmp(m_assert_exp_jmpbuf);                    \
-        if (0 == val)                                                          \
-            expr;                                                              \
-        attest(!m_expect_assert);                                              \
-    }
 
 
 /* The tests themselves */
@@ -768,41 +295,13 @@ static pubnub_t* pbp;
 
 BeforeEach(single_context_pubnub)
 {
-    pubnub_assert_set_handler((pubnub_assert_handler_t)assert_handler);
-    m_read                  = NULL;
-    m_num_string_msgs_rcvd  = 0;
-    m_num_uint8_data_blocks = 0;
-    m_i                     = 0;
-    m_j                     = 0;
-    pbp                     = pubnub_alloc();
-    assert(pbp != NULL);
+    pubnub_setup_mocks(&pbp);
     pubnub_origin_set(pbp, NULL);
-}
-
-void free_m_msgs(char** msg_array)
-{
-    int i;
-
-    assert(m_num_string_msgs_rcvd < sizeof m_string_msg_array + 1);
-
-    for (i = 0; i < m_num_string_msgs_rcvd; i++) {
-        assert(m_string_msg_array[i] != NULL);
-        free(m_string_msg_array[i]);
-        m_string_msg_array[i] = NULL;
-    }
 }
 
 AfterEach(single_context_pubnub)
 {
-    if (pbp->state != PBS_IDLE) {
-        expect(pbpal_close, when(pb, equals(pbp)), returns(0));
-        expect(pbpal_closed, when(pb, equals(pbp)), returns(true));
-        expect(pbpal_forget, when(pb, equals(pbp)));
-        expect(pbntf_trans_outcome, when(pb, equals(pbp)));
-    }
-    expect(pbpal_free, when(pb, equals(pbp)));
-    attest(pubnub_free(pbp), equals(0));
-    free_m_msgs(m_string_msg_array);
+    pubnub_cleanup_mocks(pbp);
 }
 
 
@@ -836,28 +335,6 @@ static inline void expect_outgoing_with_url(char const* url)
 }
 
 
-static inline void incoming(char const* str, struct uint8_block* p_data)
-{
-    if (str != NULL) {
-        char* pmsg = malloc(sizeof(char) * (strlen(str) + 1));
-
-        assert(pmsg != NULL);
-        assert(m_num_string_msgs_rcvd < sizeof m_string_msg_array);
-        /** Marks the bit for string to be read(received) in due time.
-            If the bit is 0 uint8_data_block is expected.
-         */
-        string_or_uint8block_mask[(m_num_string_msgs_rcvd + m_num_uint8_data_blocks) / 8] |=
-            1 << (m_num_string_msgs_rcvd + m_num_uint8_data_blocks) % 8;
-        strcpy(pmsg, str);
-        m_string_msg_array[m_num_string_msgs_rcvd++] = pmsg;
-    }
-    if (p_data != NULL) {
-        assert(m_num_uint8_data_blocks < sizeof m_uint8_data_block_array);
-        m_uint8_data_block_array[m_num_uint8_data_blocks++] = p_data;
-    }
-}
-
-
 static inline void incoming_and_close(char const* str, struct uint8_block* p_data)
 {
     incoming(str, p_data);
@@ -882,10 +359,11 @@ static void cancel_and_cleanup(pubnub_t* pbp)
 Ensure(single_context_pubnub, leave_have_dns)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subkey/channel/lamanche/"
-                             "leave?pnsdk=unit-test-0.1");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -901,6 +379,7 @@ Ensure(single_context_pubnub, leave_have_dns)
 Ensure(single_context_pubnub, leave_wait_dns)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* DNS resolution not yet available... */
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
@@ -924,7 +403,7 @@ Ensure(single_context_pubnub, leave_wait_dns)
            when(pb, equals(pbp)),
            returns(pbpal_connect_success));
     expect_outgoing_with_url("/v2/presence/sub-key/subkey/channel/lamanche/"
-                             "leave?pnsdk=unit-test-0.1");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -938,6 +417,7 @@ Ensure(single_context_pubnub, leave_wait_dns)
 Ensure(single_context_pubnub, leave_wait_dns_cancel)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* DNS resolution not yet available... */
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
@@ -959,6 +439,7 @@ Ensure(single_context_pubnub, leave_wait_dns_cancel)
 Ensure(single_context_pubnub, leave_wait_tcp)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* DNS resolved but TCP connection not yet established... */
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
@@ -971,7 +452,7 @@ Ensure(single_context_pubnub, leave_wait_tcp)
     /* ... and here it is: */
     expect(pbpal_check_connect, when(pb, equals(pbp)), returns(pbpal_connect_success));
     expect_outgoing_with_url("/v2/presence/sub-key/subkey/channel/lamanche/"
-                             "leave?pnsdk=unit-test-0.1");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -985,6 +466,7 @@ Ensure(single_context_pubnub, leave_wait_tcp)
 Ensure(single_context_pubnub, leave_wait_tcp_cancel)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* DNS resolved but TCP connection not yet established... */
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
@@ -1005,11 +487,12 @@ Ensure(single_context_pubnub, leave_wait_tcp_cancel)
 Ensure(single_context_pubnub, leave_changroup)
 {
     pubnub_init(pbp, "kpub", "ssub");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* Both channel and channel group set */
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/ssub/channel/k1/"
-                             "leave?pnsdk=unit-test-0.1&channel-group=tnt");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id&channel-group=tnt");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1023,7 +506,7 @@ Ensure(single_context_pubnub, leave_changroup)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/v2/presence/sub-key/ssub/channel/,/"
-                             "leave?pnsdk=unit-test-0.1&channel-group=mala");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id&channel-group=mala");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1038,10 +521,10 @@ Ensure(single_context_pubnub, leave_changroup)
 Ensure(single_context_pubnub, leave_uuid_auth)
 {
     pubnub_init(pbp, "pubX", "Xsub");
-    attest(pbp->core.uuid_len, equals(0));
+    attest(pbp->core.user_id_len, equals(0));
 
     /* Set UUID */
-    pubnub_set_uuid(pbp, "DEDA-BABACECA-DECA");
+    pubnub_set_user_id(pbp, "DEDA-BABACECA-DECA");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/Xsub/channel/k/"
                              "leave?pnsdk=unit-test-0.1&uuid=DEDA-BABACECA-"
@@ -1051,7 +534,7 @@ Ensure(single_context_pubnub, leave_uuid_auth)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_leave(pbp, "k", NULL), equals(PNR_OK));
     attest(pubnub_last_http_code(pbp), equals(200));
-    attest(pbp->core.uuid_len, equals(18));
+    attest(pbp->core.user_id_len, equals(18));
 
     /* Set auth, too */
     pubnub_set_auth(pbp, "super-secret-key");
@@ -1066,25 +549,24 @@ Ensure(single_context_pubnub, leave_uuid_auth)
     attest(pubnub_leave(pbp, "k2", NULL), equals(PNR_OK));
     attest(pubnub_last_http_code(pbp), equals(200));
 
-    /* Reset UUID */
-    pubnub_set_uuid(pbp, NULL);
+    /* Change UUID */
+    pubnub_set_user_id(pbp, "test_id");
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/v2/presence/sub-key/Xsub/channel/k3/"
-                             "leave?pnsdk=unit-test-0.1&auth=super-secret-key");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id&auth=super-secret-key");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_leave(pbp, "k3", NULL), equals(PNR_OK));
     attest(pubnub_last_http_code(pbp), equals(200));
-    attest(pbp->core.uuid_len, equals(0));
 
     /* Reset auth, too */
     pubnub_set_auth(pbp, NULL);
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url(
-        "/v2/presence/sub-key/Xsub/channel/k4/leave?pnsdk=unit-test-0.1");
+        "/v2/presence/sub-key/Xsub/channel/k4/leave?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1096,10 +578,11 @@ Ensure(single_context_pubnub, leave_uuid_auth)
 Ensure(single_context_pubnub, leave_bad_response)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subkey/channel/lamanche/"
-                             "leave?pnsdk=unit-test-0.1");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n[]", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1110,10 +593,11 @@ Ensure(single_context_pubnub, leave_bad_response)
 Ensure(single_context_pubnub, leave_in_progress)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subkey/channel/lamanche/"
-                             "leave?pnsdk=unit-test-0.1");
+                             "leave?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\n", NULL);
     /* simulates 'callback' condition of PNR_IN_PROGRESS.
      * expl: recv_msg would return 0 otherwise as if the connection
@@ -1133,9 +617,10 @@ Ensure(single_context_pubnub, leave_in_progress)
 Ensure(single_context_pubnub, time)
 {
     pubnub_init(pbp, "tkey", "subt");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
-    expect_outgoing_with_url("/time/0?pnsdk=unit-test-0.1");
+    expect_outgoing_with_url("/time/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 9\r\n\r\n[1643092]", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1150,9 +635,10 @@ Ensure(single_context_pubnub, time)
 Ensure(single_context_pubnub, time_bad_response)
 {
     pubnub_init(pbp, "tkey", "subt");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
-    expect_outgoing_with_url("/time/0?pnsdk=unit-test-0.1");
+    expect_outgoing_with_url("/time/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 9\r\n\r\n{1643092}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1167,9 +653,10 @@ Ensure(single_context_pubnub, time_bad_response)
 Ensure(single_context_pubnub, time_in_progress)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
-    expect_outgoing_with_url("/time/0?pnsdk=unit-test-0.1");
+    expect_outgoing_with_url("/time/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\n", NULL);
     /* incoming empty string simulates conditions for PNR_IN_PROGRESS */
     incoming("", NULL);
@@ -1186,11 +673,12 @@ Ensure(single_context_pubnub, time_in_progress)
 Ensure(single_context_pubnub, publish)
 {
     pubnub_init(pbp, "publkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url(
-        "/publish/publkey/subkey/0/jarak/0/%22zec%22?pnsdk=unit-test-0.1");
+        "/publish/publkey/subkey/0/jarak/0/%22zec%22?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "30\r\n\r\n[1,\"Sent\",\"14178940800777403\"]",
              NULL);
@@ -1205,6 +693,8 @@ Ensure(single_context_pubnub, publish)
 Ensure(single_context_pubnub, publish_change_origin)
 {
     pubnub_init(pbp, "publkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
+
     attest(pubnub_get_origin(pbp), streqs(PUBNUB_ORIGIN));
     attest(pubnub_origin_set(pbp, "new_origin_server"), equals(0));
     expect_have_dns_for_pubnub_origin();
@@ -1212,7 +702,7 @@ Ensure(single_context_pubnub, publish_change_origin)
     expect(pbpal_send_str, when(s, streqs("GET ")), returns(0));
     expect(pbpal_send_status, returns(0));
     expect(pbpal_send_str,
-           when(s, streqs("/publish/publkey/subkey/0/jarak/0/%22zec%22?pnsdk=unit-test-0.1")),
+           when(s, streqs("/publish/publkey/subkey/0/jarak/0/%22zec%22?pnsdk=unit-test-0.1&uuid=test_id")),
            returns(0));
     expect(pbpal_send_status, returns(0));
     expect(pbpal_send, when(data, streqs(" HTTP/1.1\r\nHost: ")), returns(0));
@@ -1241,11 +731,12 @@ Ensure(single_context_pubnub, publish_change_origin)
 Ensure(single_context_pubnub, publish_http_chunked)
 {
     pubnub_init(pbp, "publkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url(
-        "/publish/publkey/subkey/0/jarak/0/%22zec%22?pnsdk=unit-test-0.1");
+        "/publish/publkey/subkey/0/jarak/0/%22zec%22?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nTransfer-Encoding: "
              "chunked\r\n\r\n12\r\n[1,\"Sent\",\"1417894\r\n0C\r\n0800777403\"]"
              "\r\n0\r\n",
@@ -1261,11 +752,12 @@ Ensure(single_context_pubnub, publish_http_chunked)
 Ensure(single_context_pubnub, http_headers_no_content_length_or_chunked)
 {
     pubnub_init(pbp, "publkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url(
-        "/publish/publkey/subkey/0/,/0/%22zec%22?pnsdk=unit-test-0.1");
+        "/publish/publkey/subkey/0/,/0/%22zec%22?pnsdk=unit-test-0.1&uuid=test_id");
     /* No 'content-length' nor 'chunked' header field */
     incoming("HTTP/1.1 400\r\n\r\n[0,\"Invalid\",\"14178940800999505\"]", NULL);
     expect(pbpal_close, when(pb, equals(pbp)), returns(0));
@@ -1279,11 +771,12 @@ Ensure(single_context_pubnub, http_headers_no_content_length_or_chunked)
 Ensure(single_context_pubnub, publish_failed_invalid_channel)
 {
     pubnub_init(pbp, "publkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url(
-        "/publish/publkey/subkey/0/,/0/%22zec%22?pnsdk=unit-test-0.1");
+        "/publish/publkey/subkey/0/,/0/%22zec%22?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 400\r\nContent-Length: "
              "33\r\n\r\n[0,\"Invalid\",\"14178940800999505\"]",
              NULL);
@@ -1298,6 +791,7 @@ Ensure(single_context_pubnub, publish_failed_invalid_channel)
 Ensure(single_context_pubnub, publish_msg_too_long)
 {
     pubnub_init(pbp, "publkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     char msg[PUBNUB_BUF_MAXLEN + 1];
     memset(msg, 'A', sizeof msg);
@@ -1315,10 +809,11 @@ Ensure(single_context_pubnub, publish_msg_too_long)
 Ensure(single_context_pubnub, publish_in_progress)
 {
     pubnub_init(pbp, "pubkey", "subkey");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/publish/pubkey/subkey/0/jarak/0/4443?pnsdk=unit-test-0.1");
+        "/publish/pubkey/subkey/0/jarak/0/4443?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\n", NULL);
     /* simulates recv_msg() < 0 which saves from closed connection */
     incoming("", NULL);
@@ -1334,7 +829,7 @@ Ensure(single_context_pubnub, publish_uuid_auth)
     pubnub_init(pbp, "pubX", "Xsub");
 
     /* Set UUID */
-    pubnub_set_uuid(pbp, "0ADA-BEDA-0000");
+    pubnub_set_user_id(pbp, "0ADA-BEDA-0000");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/publish/pubX/Xsub/0/k/0/"
                              "4443?pnsdk=unit-test-0.1&uuid=0ADA-BEDA-0000");
@@ -1343,7 +838,7 @@ Ensure(single_context_pubnub, publish_uuid_auth)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_publish(pbp, "k", "4443"), equals(PNR_OK));
     attest(pubnub_last_http_code(pbp), equals(200));
-    attest(pbp->core.uuid_len, equals(14));
+    attest(pbp->core.user_id_len, equals(14));
 
     /* Set auth, too */
     pubnub_set_auth(pbp, "bad-secret-key");
@@ -1358,25 +853,24 @@ Ensure(single_context_pubnub, publish_uuid_auth)
     attest(pubnub_publish(pbp, "k2", "443"), equals(PNR_OK));
     attest(pubnub_last_http_code(pbp), equals(200));
 
-    /* Reset UUID */
-    pubnub_set_uuid(pbp, NULL);
+    /* Change UUID */
+    pubnub_set_user_id(pbp, "test_id");
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/publish/pubX/Xsub/0/k3/0/"
-                             "4443?pnsdk=unit-test-0.1&auth=bad-secret-key");
+                             "4443?pnsdk=unit-test-0.1&uuid=test_id&auth=bad-secret-key");
     incoming("HTTP/1.1 200\r\nContent-Length: 3\r\n\r\n[1]", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_publish(pbp, "k3", "4443"), equals(PNR_OK));
     attest(pubnub_last_http_code(pbp), equals(200));
-    attest(pbp->core.uuid_len, equals(0));
 
     /* Reset auth, too */
     pubnub_set_auth(pbp, NULL);
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url(
-        "/publish/pubX/Xsub/0/k4/0/443?pnsdk=unit-test-0.1");
+        "/publish/pubX/Xsub/0/k4/0/443?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 3\r\n\r\n[1]", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1387,10 +881,11 @@ Ensure(single_context_pubnub, publish_uuid_auth)
 Ensure(single_context_pubnub, publish_bad_response)
 {
     pubnub_init(pbp, "tkey", "subt");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/publish/tkey/subt/0/k6/0/443?pnsdk=unit-test-0.1");
+        "/publish/tkey/subt/0/k6/0/443?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 9\r\n\r\n<\"1\":\"X\">", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1405,10 +900,11 @@ Ensure(single_context_pubnub, publish_bad_response)
 Ensure(single_context_pubnub, publish_failed_server_side)
 {
     pubnub_init(pbp, "tkey", "subt");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/publish/tkey/subt/0/k6/0/443?pnsdk=unit-test-0.1");
+        "/publish/tkey/subt/0/k6/0/443?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 9\r\n\r\n{\"1\":\"X\"}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
@@ -1425,12 +921,13 @@ Ensure(single_context_pubnub, publish_failed_server_side)
 Ensure(single_context_pubnub, history_without_timetoken)
 {
     pubnub_init(pbp, "publhis", "subhis");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* Without time-token */
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v2/history/sub-key/subhis/channel/"
-                             "ch?pnsdk=unit-test-0.1&count=22&include_token="
+                             "ch?pnsdk=unit-test-0.1&uuid=test_id&count=22&include_token="
                              "false");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "45\r\n\r\n[[1,2,3],14370854953886727,14370864554607266]",
@@ -1449,11 +946,12 @@ Ensure(single_context_pubnub, history_without_timetoken)
 Ensure(single_context_pubnub, history_with_timetoken)
 {
     pubnub_init(pbp, "publhis", "subhis");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* With time-token */
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/history/sub-key/subhis/channel/"
-                             "ch?pnsdk=unit-test-0.1&count=22&include_token="
+                             "ch?pnsdk=unit-test-0.1&uuid=test_id&count=22&include_token="
                              "true");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "171\r\n\r\n[[{\"message\":1,\"timetoken\":14370863460777883},{"
@@ -1479,11 +977,12 @@ Ensure(single_context_pubnub, history_with_timetoken)
 Ensure(single_context_pubnub, history_in_progress)
 {
     pubnub_init(pbp, "publhis", "subhis");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v2/history/sub-key/subhis/channel/"
-                             "ch?pnsdk=unit-test-0.1&count=22&include_token="
+                             "ch?pnsdk=unit-test-0.1&uuid=test_id&count=22&include_token="
                              "false");
     incoming("HTTP/1.1 200\r\n", NULL);
     incoming("", NULL);
@@ -1497,11 +996,12 @@ Ensure(single_context_pubnub, history_in_progress)
 Ensure(single_context_pubnub, history_auth)
 {
     pubnub_init(pbp, "pubX", "Xsub");
+    pubnub_set_user_id(pbp, "test_id");
 
     pubnub_set_auth(pbp, "go-secret-key");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/history/sub-key/Xsub/channel/"
-                             "hhh?pnsdk=unit-test-0.1&count="
+                             "hhh?pnsdk=unit-test-0.1&uuid=test_id&count="
                              "40&include_token=false&auth=go-secret-key");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n[]", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
@@ -1515,10 +1015,11 @@ Ensure(single_context_pubnub, history_auth)
 Ensure(single_context_pubnub, history_bad_response)
 {
     pubnub_init(pbp, "pubkey", "Xsub");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/history/sub-key/Xsub/channel/"
-                             "ttt?pnsdk=unit-test-0.1&count=10&include_token="
+                             "ttt?pnsdk=unit-test-0.1&uuid=test_id&count=10&include_token="
                              "false");
     incoming("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\n{}", NULL);
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
@@ -1537,11 +1038,12 @@ Ensure(single_context_pubnub, gets_advanced_history_message_counts_for_two_chann
     pubnub_chamebl_t channel_2 = {"other", sizeof "other" - 1};
     
     pubnub_init(pbp, "pub-nina", "sub-pinta");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v3/history/sub-key/sub-pinta/message-counts/"
-                             "some,other?pnsdk=unit-test-0.1&timetoken=14378854953886727");
+                             "some,other?pnsdk=unit-test-0.1&uuid=test_id&timetoken=14378854953886727");
     incoming("HTTP/1.1 200\r\nContent-Length: 85\r\n\r\n"
              "{\"status\":200, \"error\": false, \"error_message\": \"\", \"channels\": {\"some\":1,\"other\":5}}",
              NULL);
@@ -1570,11 +1072,12 @@ Ensure(single_context_pubnub, gets_message_counts_for_two_channels_since_channel
     pubnub_chamebl_t channel_2 = {"wind", sizeof "wind" - 1};
     
     pubnub_init(pbp, "pub-mission", "sub-santa-maria");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v3/history/sub-key/sub-santa-maria/message-counts/"
-                             "ocean,wind?pnsdk=unit-test-0.1&channelsTimetoken="
+                             "ocean,wind?pnsdk=unit-test-0.1&uuid=test_id&channelsTimetoken="
                              "14378854953886727,14378856783886727");
     incoming("HTTP/1.1 200\r\nContent-Length: 87\r\n\r\n"
              "{\"status\":200, \"error\": false, \"error_message\": \"\", \"channels\": {\"wind\":18,\"ocean\":76}}",
@@ -1608,11 +1111,12 @@ Ensure(single_context_pubnub,
     int o_count[3];
     
     pubnub_init(pbp, "pub-delta", "sub-echo");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v3/history/sub-key/sub-echo/message-counts/"
-                             "bravo,alfa,charlie?pnsdk=unit-test-0.1&channelsTimetoken="
+                             "bravo,alfa,charlie?pnsdk=unit-test-0.1&uuid=test_id&channelsTimetoken="
                              "15378854953886727,15378856783886727,15378856783886727");
     incoming("HTTP/1.1 200\r\nContent-Length: 106\r\n\r\n"
              "{\"status\":200, \"error\": false, \"error_message\": \"\", \"channels\": {\"charlie\":25,\"alfa\":196 ,  \"bravo\":3 }  }",
@@ -1643,11 +1147,12 @@ Ensure(single_context_pubnub,
     pubnub_chamebl_t o_msg = {msg,}; 
     
     pubnub_init(pbp, "pub-foxtrot", "sub-golf");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v3/history/sub-key/sub-golf/message-counts/"
-                             "hotel?pnsdk=unit-test-0.1&timetoken="
+                             "hotel?pnsdk=unit-test-0.1&uuid=test_id&timetoken="
                              "15578854953886727");
     incoming("HTTP/1.1 404\r\nContent-Length: 105\r\n\r\n"
              "{\"status\":404 , \"error\": true, \"error_message\"  : \"there must be some kind of mistake\", \"channels\": {}  }",
@@ -1682,11 +1187,12 @@ Ensure(single_context_pubnub,
     pubnub_chamebl_t o_msg = {msg,}; 
 
     pubnub_init(pbp, "pub-november", "sub-oscar");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v3/history/sub-key/sub-oscar/message-counts/"
-                             "papa,quebec?pnsdk=unit-test-0.1&channelsTimetoken="
+                             "papa,quebec?pnsdk=unit-test-0.1&uuid=test_id&channelsTimetoken="
                              "15578854953886727,15516381360410684");
     /* Starting 'curly' is missing */
     incoming("HTTP/1.1 404\r\nContent-Length: 104\r\n\r\n"
@@ -1702,7 +1208,7 @@ Ensure(single_context_pubnub,
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/v3/history/sub-key/sub-oscar/message-counts/"
-                             "papa?pnsdk=unit-test-0.1&timetoken="
+                             "papa?pnsdk=unit-test-0.1&uuid=test_id&timetoken="
                              "15578854953886727");
     /* 'error_message' is missing */
     incoming("HTTP/1.1 404\r\nContent-Length: 47\r\n\r\n"
@@ -1719,7 +1225,7 @@ Ensure(single_context_pubnub,
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/v3/history/sub-key/sub-oscar/message-counts/"
-                             "papa?pnsdk=unit-test-0.1&timetoken="
+                             "papa?pnsdk=unit-test-0.1&uuid=test_id&timetoken="
                              "15378854953886727");
     /* 'error' is missing */
     incoming("HTTP/1.1 404\r\nContent-Length: 90\r\n\r\n"
@@ -1737,7 +1243,7 @@ Ensure(single_context_pubnub,
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/v3/history/sub-key/sub-oscar/message-counts/"
-                             "papa?pnsdk=unit-test-0.1&timetoken="
+                             "papa?pnsdk=unit-test-0.1&uuid=test_id&timetoken="
                              "15378854953886727");
     /* 'channels' are missing */
     incoming("HTTP/1.1 200\r\nContent-Length: 76\r\n\r\n"
@@ -1763,11 +1269,12 @@ Ensure(single_context_pubnub,
     pubnub_chamebl_t o_msg = {msg,}; 
     
     pubnub_init(pbp, "pub-india", "sub-juliett");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v3/history/sub-key/sub-juliett/message-counts/"
-                             "kilo,lima,mike?pnsdk=unit-test-0.1&channelsTimetoken="
+                             "kilo,lima,mike?pnsdk=unit-test-0.1&uuid=test_id&channelsTimetoken="
                              "15378856783886727,15378856783886727,15378854953886727");
     incoming("HTTP/1.1 200\r\nContent-Length: 130\r\n\r\n"
              "{\"status\":200, \"error\": false, \"error_message\"",
@@ -1821,11 +1328,12 @@ Ensure(single_context_pubnub,
     pubnub_chamebl_t channel_2 = {"sierra", sizeof "sierra" - 1};
     
     pubnub_init(pbp, "pub-quebeq", "sub-romeo");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
 
     expect_outgoing_with_url("/v3/history/sub-key/sub-romeo/message-counts/"
-                             "sierra,tango?pnsdk=unit-test-0.1&channelsTimetoken="
+                             "sierra,tango?pnsdk=unit-test-0.1&uuid=test_id&channelsTimetoken="
                              "15378854953886727,15378856783886727");
     incoming("HTTP/1.1 200\r\nContent-Length: 112\r\n\r\n"
              "{\"status\":200, \"error\": false, \"error_message\": \"\", \"channels\": { \"tango\":38 ,  \"sierra\":17 , \"uniform\": 51 }  }",
@@ -1857,6 +1365,7 @@ Ensure(single_context_pubnub,
        advanced_history_message_counts_handles_invalid_timetokens)
 {
     pubnub_init(pbp, "pub-delta", "sub-echo");
+    pubnub_set_user_id(pbp, "test_id");
 
     attest(pubnub_message_counts(pbp, "victor", "153"), equals(PNR_INVALID_PARAMETERS));
     attest(pubnub_message_counts(pbp,
@@ -1891,6 +1400,7 @@ Ensure(single_context_pubnub,
     char channel_name_too_long[PUBNUB_MAX_CHANNEL_NAME_LENGTH + 4];
     
     pubnub_init(pbp, "pub-delta", "sub-echo");
+    pubnub_set_user_id(pbp, "test_id");
 
     memset(channel_name_too_long, 'a', sizeof channel_name_too_long - 1);
     channel_name_too_long[sizeof channel_name_too_long - 1] = '\0';
@@ -1931,7 +1441,7 @@ Ensure(single_context_pubnub, set_state)
     pubnub_init(pbp, "publhis", "subhis");
 
     /* with uuid from context */
-    pubnub_set_uuid(pbp, "universal");
+    pubnub_set_user_id(pbp, "universal");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subhis/channel/ch/uuid/"
                              "universal/data?pnsdk=unit-test-0.1&uuid=universal&state=%7B%7D");
@@ -1942,7 +1452,7 @@ Ensure(single_context_pubnub, set_state)
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_set_state(pbp, "ch", NULL, NULL, "{}"), equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(9));
+    attest(pbp->core.user_id_len, equals(9));
 
     attest(pubnub_get(pbp), streqs("{\"status\": 200,\"message\":\"OK\", \"service\": \"Presence\", \"payload\":{}}"));
     attest(pubnub_get(pbp), equals(NULL));
@@ -2021,11 +1531,12 @@ Ensure(single_context_pubnub, set_state)
 Ensure(single_context_pubnub, set_state_in_progress)
 {
     pubnub_init(pbp, "publ-one", "sub-one");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
         "/v2/presence/sub-key/sub-one/channel/ch/uuid/blackbeard/"
-        "data?pnsdk=unit-test-0.1&state=%7B%22the_pirate%22%3A%22true%22%7D");
+        "data?pnsdk=unit-test-0.1&uuid=test_id&state=%7B%22the_pirate%22%3A%22true%22%7D");
     incoming("HTTP/1.1 200\r\n", NULL);
     incoming("", NULL);
     attest(pubnub_set_state(pbp, "ch", NULL, "blackbeard", "{\"the_pirate\":\"true\"}"),
@@ -2040,11 +1551,12 @@ Ensure(single_context_pubnub, set_state_in_progress)
 Ensure(single_context_pubnub, set_state_in_progress_interrupted_and_accomplished)
 {
     pubnub_init(pbp, "publ-one", "sub-one");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
         "/v2/presence/sub-key/sub-one/channel/ch/uuid/blackbeard/"
-        "data?pnsdk=unit-test-0.1&state=%7B%22the_pirate%22%3A%22true%22%7D");
+        "data?pnsdk=unit-test-0.1&uuid=test_id&state=%7B%22the_pirate%22%3A%22true%22%7D");
     /* incoming first message */
     incoming("HTTP/1.1 200\r\n", NULL);
     incoming("", NULL);
@@ -2079,7 +1591,7 @@ Ensure(single_context_pubnub, set_state_set_auth_and_uuid)
     pubnub_init(pbp, "pubX", "Xsub");
 
     pubnub_set_auth(pbp, "portobello");
-    pubnub_set_uuid(pbp, "morgan");
+    pubnub_set_user_id(pbp, "morgan");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/Xsub/channel/ch/uuid/morgan/"
                              "data?pnsdk=unit-test-0.1&uuid=morgan&auth=portobello&state=%7B%22the_privateer%22%3A%22letter_of_marque%22%7D");
@@ -2095,14 +1607,14 @@ Ensure(single_context_pubnub, set_state_set_auth_and_uuid)
            equals(PNR_OK));
 
     attest(pubnub_last_http_code(pbp), equals(200));
-    attest(pbp->core.uuid_len, equals(6));
+    attest(pbp->core.user_id_len, equals(6));
 }
 
 Ensure(single_context_pubnub, set_state_bad_response)
 {
     pubnub_init(pbp, "pubkey", "Xsub");
 
-    pubnub_set_uuid(pbp, "chili_peppers");
+    pubnub_set_user_id(pbp, "chili_peppers");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
         "/v2/presence/sub-key/Xsub/channel/ch/uuid/chili_peppers/"
@@ -2114,7 +1626,7 @@ Ensure(single_context_pubnub, set_state_bad_response)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_set_state(pbp, "ch", NULL, NULL, "{\"chili\":\"red\"}"),
            equals(PNR_FORMAT_ERROR));
-    attest(pbp->core.uuid_len, equals(13));
+    attest(pbp->core.user_id_len, equals(13));
 }
 
 
@@ -2125,7 +1637,7 @@ Ensure(single_context_pubnub, state_get_1channel)
     pubnub_init(pbp, "key", "subY");
 
     /* with uuid from context */
-    pubnub_set_uuid(pbp, "speedy");
+    pubnub_set_user_id(pbp, "speedy");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
         "/v2/presence/sub-key/subY/channel/ch/uuid/speedy?pnsdk=unit-test-0.1&uuid=speedy");
@@ -2136,7 +1648,7 @@ Ensure(single_context_pubnub, state_get_1channel)
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_state_get(pbp, "ch", NULL, NULL), equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(6));
+    attest(pbp->core.user_id_len, equals(6));
 
     attest(pubnub_get(pbp), streqs("{\"status\": 200,\"message\":\"OK\", \"service\": \"Presence\", \"payload\":{\"running\"}}"));
     attest(pubnub_get(pbp), equals(NULL));
@@ -2165,6 +1677,7 @@ Ensure(single_context_pubnub, state_get_1channel)
 Ensure(single_context_pubnub, state_get_channelgroup)
 {
     pubnub_init(pbp, "key", "subY");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* state_get to 'channel group(s)' with 'auth' set in context and 'uuid'
      * from parameter to the function */
@@ -2172,7 +1685,7 @@ Ensure(single_context_pubnub, state_get_channelgroup)
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subY/channel/,/uuid/"
                              "fireworks?pnsdk=unit-test-0.1&channel-group=[gr1,"
-                             "gr2]&auth=mouth");
+                             "gr2]&uuid=test_id&auth=mouth");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "141\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\",\"payload\":{\"channels\":{\"alfa\":{key:value},"
@@ -2196,7 +1709,7 @@ Ensure(single_context_pubnub, state_get_channelgroup)
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/v2/presence/sub-key/subY/channel/[ch1,ch2]/uuid/"
                              "leslie-mann?pnsdk=unit-test-0.1&channel-group=["
-                             "gr3,gr4]&auth=cat");
+                             "gr3,gr4]&uuid=test_id&auth=cat");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "153\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\",\"payload\":{\"channels\":{\"ch1\":{jason_state},"
@@ -2224,10 +1737,11 @@ Ensure(single_context_pubnub, state_get_channelgroup)
 Ensure(single_context_pubnub, state_get_in_progress_interrupted_and_accomplished)
 {
     pubnub_init(pbp, "publ-key", "sub-key");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/sub-key/channel/ch/uuid/"
-                             "dragon?pnsdk=unit-test-0.1");
+                             "dragon?pnsdk=unit-test-0.1&uuid=test_id");
     /* incoming first message */
     incoming("HTTP/1.1 200\r\n", NULL);
     /* incoming empty string simulates conditions for PNR_IN_PROGRESS */
@@ -2262,7 +1776,7 @@ Ensure(single_context_pubnub, state_get_bad_response)
 {
     pubnub_init(pbp, "publkey", "Xsub");
 
-    pubnub_set_uuid(pbp, "annoying");
+    pubnub_set_user_id(pbp, "annoying");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/Xsub/channel/ch/uuid/"
                              "annoying?pnsdk=unit-test-0.1&uuid=annoying");
@@ -2270,19 +1784,68 @@ Ensure(single_context_pubnub, state_get_bad_response)
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_state_get(pbp, "ch", NULL, NULL), equals(PNR_FORMAT_ERROR));
-    attest(pbp->core.uuid_len, equals(8));
+    attest(pbp->core.user_id_len, equals(8));
 }
 
+// TODO: move coreapi_ex to new module
+Ensure(single_context_pubnub, set_state_ex_defaults)
+{
+    pubnub_init(pbp, "publhis", "subhis");
 
+    /* with uuid from context */
+    pubnub_set_user_id(pbp, "universal");
+    expect_have_dns_for_pubnub_origin();
+    expect_outgoing_with_url("/v2/presence/sub-key/subhis/channel/ch/uuid/"
+                             "universal/data?pnsdk=unit-test-0.1&uuid=universal&state=%7B%7D");
+    incoming("HTTP/1.1 200\r\nContent-Length: 67\r\n\r\n{\"status\": "
+             "200,\"message\":\"OK\", \"service\": \"Presence\", "
+             "\"payload\":{}}",
+             NULL);
+    expect(pbntf_lost_socket, when(pb, equals(pbp)));
+    expect(pbntf_trans_outcome, when(pb, equals(pbp)));
+
+    attest(pubnub_set_state_ex(pbp, "ch", "{}", pubnub_set_state_defopts()), equals(PNR_OK));
+
+    attest(pubnub_get(pbp), streqs("{\"status\": 200,\"message\":\"OK\", \"service\": \"Presence\", \"payload\":{}}"));
+    attest(pubnub_get(pbp), equals(NULL));
+    attest(pubnub_last_http_code(pbp), equals(200));
+} 
+
+// TODO: move coreapi_ex to new module
+Ensure(single_context_pubnub, state_get_with_heartbeat)
+{ 
+    pubnub_init(pbp, "pub-key", "sub-key");
+    pubnub_set_user_id(pbp, "test-id");
+ 
+    expect_have_dns_for_pubnub_origin();
+    expect_outgoing_with_url("/v2/presence/sub-key/sub-key/channel/ch/"
+                             "heartbeat?pnsdk=unit-test-0.1&uuid=test-id&state=%7B%22ch%22%3A%7B%7D%7D");
+    incoming("HTTP/1.1 200\r\nContent-Length: 67\r\n\r\n{\"status\": "
+             "200,\"message\":\"OK\", \"service\": \"Presence\", "
+             "\"payload\":{}}",
+             NULL);
+    expect(pbntf_lost_socket, when(pb, equals(pbp)));
+    expect(pbntf_trans_outcome, when(pb, equals(pbp)));
+    
+    struct pubnub_set_state_options options = pubnub_set_state_defopts();
+    options.heartbeat = true;
+    attest(pubnub_set_state_ex(pbp, "ch", "{}", options), equals(PNR_OK));
+ 
+    attest(pubnub_get(pbp), streqs("{\"status\": 200,\"message\":\"OK\", \"service\": \"Presence\", \"payload\":{}}"));
+    attest(pubnub_get(pbp), equals(NULL));
+    attest(pubnub_last_http_code(pbp), equals(200));
+} 
+ 
 /* HERE_NOW operation */
 
 Ensure(single_context_pubnub, here_now_channel)
 {
     pubnub_init(pbp, "publZ", "subZ");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/v2/presence/sub-key/subZ/channel/shade?pnsdk=unit-test-0.1");
+        "/v2/presence/sub-key/subZ/channel/shade?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 98\r\n\r\n{\"status\": "
              "200,\"message\":\"OK\", \"service\": \"Presence\", "
              "\"uuids\":[jack,johnnie,chivas],\"occupancy\":3}",
@@ -2299,11 +1862,12 @@ Ensure(single_context_pubnub, here_now_channel)
 Ensure(single_context_pubnub, here_now_channel_with_auth)
 {
     pubnub_init(pbp, "publZ", "subZ");
+    pubnub_set_user_id(pbp, "test_id");
 
     pubnub_set_auth(pbp, "auth-key");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subZ/channel/"
-                             "channel?pnsdk=unit-test-0.1&auth=auth-key");
+                             "channel?pnsdk=unit-test-0.1&uuid=test_id&auth=auth-key");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "102\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\",\"uuids\":[daniel's,walker,regal,beam],"
@@ -2323,13 +1887,14 @@ Ensure(single_context_pubnub, here_now_channel_with_auth)
 Ensure(single_context_pubnub, here_now_channelgroups)
 {
     pubnub_init(pbp, "publZ", "subZ");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* set_auth */
     pubnub_set_auth(pbp, "mouse");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subZ/channel/"
                              ",?pnsdk=unit-test-0.1&channel-group=[gr2,gr1]&"
-                             "auth=mouse");
+                             "uuid=test_id&auth=mouse");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "233\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\",\"payload\":{channels:{\"ch1\":{\"uuids\":[uuid1,"
@@ -2360,7 +1925,7 @@ Ensure(single_context_pubnub, here_now_channel_and_channelgroups)
 
     /* here_now on 'channel(s)' and 'channel group(s)' with 'auth' and 'uuid' */
     pubnub_set_auth(pbp, "globe");
-    pubnub_set_uuid(pbp, "12345");
+    pubnub_set_user_id(pbp, "12345");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/subZ/channel/"
                              "[ch1,ch2]?pnsdk=unit-test-0.1&channel-group=[gr3,"
@@ -2378,7 +1943,7 @@ Ensure(single_context_pubnub, here_now_channel_and_channelgroups)
     attest(pubnub_here_now(pbp, "[ch1,ch2]", "[gr3,gr4]"), equals(PNR_STARTED));
     attest(pbnc_fsm(pbp), equals(0));
     attest(pbp->core.last_result, equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(5));
+    attest(pbp->core.user_id_len, equals(5));
 
     attest(pubnub_get(pbp),
            streqs("{\"status\":200,\"message\":\"OK\",\"service\":\"Presence\","
@@ -2405,7 +1970,7 @@ Ensure(single_context_pubnub, here_now_channel_and_channelgroups_chunked)
 
     /* here_now on 'channel(s)' and 'channel group(s)' with 'auth' and 'uuid' */
     pubnub_set_auth(pbp, "globe");
-    pubnub_set_uuid(pbp, "12345");
+    pubnub_set_user_id(pbp, "12345");
     expect_have_dns_for_pubnub_origin();
 
     /* Don't forget that chunk lengths should be in hexadecimal representation
@@ -2426,7 +1991,7 @@ Ensure(single_context_pubnub, here_now_channel_and_channelgroups_chunked)
     attest(pubnub_here_now(pbp, "[ch1,ch2]", "[gr3,gr4]"), equals(PNR_STARTED));
     attest(pbnc_fsm(pbp), equals(0));
     attest(pbp->core.last_result, equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(5));
+    attest(pbp->core.user_id_len, equals(5));
 
     attest(pubnub_get(pbp),
            streqs("{\"status\":200,\"message\":\"OK\",\"service\":\"Presence\","
@@ -2446,7 +2011,7 @@ Ensure(single_context_pubnub, here_now_in_progress_interrupted_and_accomplished)
 
     /* here_now on 'channel(s)' and 'channel group(s)' with 'auth' and 'uuid' */
     pubnub_set_auth(pbp, "lion");
-    pubnub_set_uuid(pbp, "cub");
+    pubnub_set_user_id(pbp, "cub");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/sub-one/channel/"
                              "[ch5,ch7]?pnsdk=unit-test-0.1&channel-group=[gr1,"
@@ -2457,7 +2022,7 @@ Ensure(single_context_pubnub, here_now_in_progress_interrupted_and_accomplished)
 
     attest(pubnub_here_now(pbp, "[ch5,ch7]", "[gr1,gr2]"), equals(PNR_STARTED));
     attest(pubnub_here_now(pbp, "ch", NULL), equals(PNR_IN_PROGRESS));
-    attest(pbp->core.uuid_len, equals(3));
+    attest(pbp->core.user_id_len, equals(3));
 
     /* finish chunked */
     incoming("sage\":\"OK\",\"service\":\"Presence\",\"payload\":{channels:{"
@@ -2488,10 +2053,11 @@ Ensure(single_context_pubnub, here_now_in_progress_interrupted_and_accomplished)
 Ensure(single_context_pubnub, global_here_now)
 {
     pubnub_init(pbp, "publ-white", "sub-white");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/v2/presence/sub-key/sub-white?pnsdk=unit-test-0.1");
+        "/v2/presence/sub-key/sub-white?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "334\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\",\"payload\":{channels:{\"ch1\":{\"uuids\":[uuid1,"
@@ -2528,7 +2094,7 @@ Ensure(single_context_pubnub, global_here_now_chunked)
 
     /* With uuid & auth */
     pubnub_set_auth(pbp, "beograd");
-    pubnub_set_uuid(pbp, "pobednik");
+    pubnub_set_user_id(pbp, "pobednik");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/"
                              "sub-beo?pnsdk=unit-test-0.1&uuid=pobednik&auth=beograd");
@@ -2546,7 +2112,7 @@ Ensure(single_context_pubnub, global_here_now_chunked)
     expect(pbntf_lost_socket, when(pb, equals(pbp)));
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_global_here_now(pbp), equals(PNR_STARTED));
-    attest(pbp->core.uuid_len, equals(8));
+    attest(pbp->core.user_id_len, equals(8));
 
     attest(pbnc_fsm(pbp), equals(0));
     attest(pbp->core.last_result, equals(PNR_OK));
@@ -2567,9 +2133,10 @@ Ensure(single_context_pubnub, global_here_now_chunked)
 Ensure(single_context_pubnub, global_here_now_in_progress_interrupted_and_acomplished)
 {
     pubnub_init(pbp, "publ-my", "sub-my");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
-    expect_outgoing_with_url("/v2/presence/sub-key/sub-my?pnsdk=unit-test-0.1");
+    expect_outgoing_with_url("/v2/presence/sub-key/sub-my?pnsdk=unit-test-0.1&uuid=test_id");
     incoming(
         "HTTP/1.1 200\r\nContent-Length: 334\r\n\r\n{\"status\":200,\"mess", NULL);
     /* Keeps fsm in progress */
@@ -2610,10 +2177,11 @@ Ensure(single_context_pubnub, global_here_now_in_progress_interrupted_and_acompl
 Ensure(single_context_pubnub, where_now)
 {
     pubnub_init(pbp, "publ-where", "sub-where");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/v2/presence/sub-key/sub-where/uuid/shane(1953)?pnsdk=unit-test-0.1");
+        "/v2/presence/sub-key/sub-where/uuid/shane(1953)?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "89\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\",\"Payload\":{\"channels\":[tcm,retro,mgm]}}",
@@ -2631,7 +2199,7 @@ Ensure(single_context_pubnub, where_now_set_uuid)
 {
     pubnub_init(pbp, "publ-her", "sub-her");
 
-    pubnub_set_uuid(pbp, "50fb7a0b-1688-45b9-9f27-ea83308464d8-ab3817df");
+    pubnub_set_user_id(pbp, "50fb7a0b-1688-45b9-9f27-ea83308464d8-ab3817df");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
         "/v2/presence/sub-key/sub-her/uuid/50fb7a0b-1688-45b9-9f27-ea83308464d8"
@@ -2645,7 +2213,7 @@ Ensure(single_context_pubnub, where_now_set_uuid)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     /* Recognizes the uuid set from the context */
     attest(pubnub_where_now(pbp, NULL), equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(45));
+    attest(pbp->core.user_id_len, equals(45));
 
     attest(pubnub_get(pbp),
            streqs("{\"status\":200,\"message\":\"OK\",\"service\":\"Presence\","
@@ -2658,7 +2226,7 @@ Ensure(single_context_pubnub, where_now_set_auth)
 {
     pubnub_init(pbp, "publ-sea", "sub-sea");
 
-    pubnub_set_uuid(pbp, "fish");
+    pubnub_set_user_id(pbp, "fish");
     pubnub_set_auth(pbp, "big");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
@@ -2672,7 +2240,7 @@ Ensure(single_context_pubnub, where_now_set_auth)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     /* Chooses the uuid from the call not the one set in context */
     attest(pubnub_where_now(pbp, "whale"), equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(4));
+    attest(pbp->core.user_id_len, equals(4));
 
     attest(pubnub_get(pbp),
            streqs("{\"status\":200,\"message\":\"OK\",\"service\":\"Presence\","
@@ -2686,7 +2254,7 @@ Ensure(single_context_pubnub, where_now_in_progress_interrupted_and_accomplished
 {
     pubnub_init(pbp, "publ-good", "sub-good");
 
-    pubnub_set_uuid(pbp, "man_with_no_name");
+    pubnub_set_user_id(pbp, "man_with_no_name");
     pubnub_set_auth(pbp, "west");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
@@ -2698,7 +2266,7 @@ Ensure(single_context_pubnub, where_now_in_progress_interrupted_and_accomplished
     incoming("", NULL);
     attest(pubnub_where_now(pbp, "bad"), equals(PNR_STARTED));
     attest(pubnub_where_now(pbp, "ugly"), equals(PNR_IN_PROGRESS));
-    attest(pbp->core.uuid_len, equals(16));
+    attest(pbp->core.user_id_len, equals(16));
 
     /* client reciving rest of the message */
     incoming("vice\":\"Presence\",\"Payload\":{\"channels\":[western,here,"
@@ -2726,10 +2294,11 @@ Ensure(single_context_pubnub, where_now_in_progress_interrupted_and_accomplished
 Ensure(single_context_pubnub, heartbeat_channel)
 {
     pubnub_init(pbp, "publ-beat", "sub-beat");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/sub-beat/channel/panama/"
-                             "heartbeat?pnsdk=unit-test-0.1");
+                             "heartbeat?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "50\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\"}",
@@ -2748,11 +2317,12 @@ Ensure(single_context_pubnub, heartbeat_channel)
 Ensure(single_context_pubnub, heartbeat_channelgroups)
 {
     pubnub_init(pbp, "publ-beat", "sub-beat");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/sub-beat/channel/,/"
                              "heartbeat?pnsdk=unit-test-0.1&channel-group=["
-                             "deep,shallow]");
+                             "deep,shallow]&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "50\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\"}",
@@ -2773,7 +2343,7 @@ Ensure(single_context_pubnub, heartbeat_channel_and_channelgroups)
     pubnub_init(pbp, "publ-ocean", "sub-ocean");
 
     pubnub_set_auth(pbp, "sailing");
-    pubnub_set_uuid(pbp, "capetan");
+    pubnub_set_user_id(pbp, "capetan");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/sub-ocean/channel/"
                              "young_and_salty/"
@@ -2787,7 +2357,7 @@ Ensure(single_context_pubnub, heartbeat_channel_and_channelgroups)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_heartbeat(pbp, "young_and_salty", "[deep,shallow]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(7));
+    attest(pbp->core.user_id_len, equals(7));
 
     attest(
         pubnub_get(pbp),
@@ -2800,6 +2370,7 @@ Ensure(single_context_pubnub, heartbeat_channel_and_channelgroups)
 Ensure(single_context_pubnub, heartbeat_no_channel_and_no_channelgroups)
 {
     pubnub_init(pbp, "publ-", "sub-");
+    pubnub_set_user_id(pbp, "test_id");
     attest(pubnub_heartbeat(pbp, NULL, NULL), equals(PNR_INVALID_CHANNEL));
 }
 
@@ -2809,7 +2380,7 @@ Ensure(single_context_pubnub,
     pubnub_init(pbp, "publ-game", "sub-game");
 
     pubnub_set_auth(pbp, "white");
-    pubnub_set_uuid(pbp, "player");
+    pubnub_set_user_id(pbp, "player");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v2/presence/sub-key/sub-game/channel/moves/"
                              "heartbeat?pnsdk=unit-test-0.1&channel-group=["
@@ -2818,7 +2389,7 @@ Ensure(single_context_pubnub,
     incoming("", NULL);
     attest(pubnub_heartbeat(pbp, "moves", "[fast,slow]"), equals(PNR_STARTED));
     attest(pubnub_heartbeat(pbp, "punches", "[fast,slow]"), equals(PNR_IN_PROGRESS));
-    attest(pbp->core.uuid_len, equals(6));
+    attest(pbp->core.user_id_len, equals(6));
 
     incoming(" 50\r\n\r\n{\"status\":200,\"message\":\"OK\",\"service\":"
              "\"Presence\"}",
@@ -2843,11 +2414,12 @@ Ensure(single_context_pubnub,
 Ensure(single_context_pubnub, add_channel_to_group)
 {
     pubnub_init(pbp, "publ-kc", "sub-kc");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v1/channel-registration/sub-key/sub-kc/"
                              "channel-group/"
-                             "ch_group?pnsdk=unit-test-0.1&add=ch_one");
+                             "ch_group?pnsdk=unit-test-0.1&uuid=test_id&add=ch_one");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "72\r\n\r\n{\"service\":\"channel-registry\",\"status\":200,"
              "\"error\":false,\"message\":\"OK\"}",
@@ -2864,12 +2436,13 @@ Ensure(single_context_pubnub, add_channel_to_group)
 Ensure(single_context_pubnub, add_channel_to_group_interrupted_and_accomplished)
 {
     pubnub_init(pbp, "publ-kc", "sub-kc");
+    pubnub_set_user_id(pbp, "test_id");
     /* With auth */
     pubnub_set_auth(pbp, "rice_chocolate");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
         "/v1/channel-registration/sub-key/sub-kc/channel-group/"
-        "ch_group?pnsdk=unit-test-0.1&add=ch_one&auth=rice_chocolate");
+        "ch_group?pnsdk=unit-test-0.1&uuid=test_id&add=ch_one&auth=rice_chocolate");
     incoming("HTTP/1.1 200\r\nContent-Length: 72\r\n\r\n{\"service\"", NULL);
     /* won't close connection */
     incoming("", NULL);
@@ -2899,11 +2472,12 @@ Ensure(single_context_pubnub, add_channel_to_group_interrupted_and_accomplished)
 Ensure(single_context_pubnub, remove_channel_from_group)
 {
     pubnub_init(pbp, "publ-kum_Ruzvelt", "sub-kum_Ruzvelt");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v1/channel-registration/sub-key/sub-kum_Ruzvelt/"
                              "channel-group/"
-                             "ch_group?pnsdk=unit-test-0.1&remove=ch_one");
+                             "ch_group?pnsdk=unit-test-0.1&uuid=test_id&remove=ch_one");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "72\r\n\r\n{\"service\":\"channel-registry\",\"status\":200,"
              "\"error\":false,\"message\":\"OK\"}",
@@ -2921,12 +2495,13 @@ Ensure(single_context_pubnub, remove_channel_from_group)
 Ensure(single_context_pubnub, remove_channel_from_group_interrupted_and_accomplished)
 {
     pubnub_init(pbp, "publ-Teheran", "sub-Teheran");
+    pubnub_set_user_id(pbp, "test_id");
     /* With auth */
     pubnub_set_auth(pbp, "dates");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
         "/v1/channel-registration/sub-key/sub-Teheran/channel-group/"
-        "ch_group?pnsdk=unit-test-0.1&remove=ch_one&auth=dates");
+        "ch_group?pnsdk=unit-test-0.1&uuid=test_id&remove=ch_one&auth=dates");
     incoming("HTTP/1.1 200\r\nContent-", NULL);
     /* won't close connection */
     incoming("", NULL);
@@ -2957,11 +2532,12 @@ Ensure(single_context_pubnub, remove_channel_from_group_interrupted_and_accompli
 Ensure(single_context_pubnub, remove_channel_group)
 {
     pubnub_init(pbp, "publ-bell", "sub-bell");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v1/channel-registration/sub-key/sub-bell/"
                              "channel-group/group_name/"
-                             "remove?pnsdk=unit-test-0.1");
+                             "remove?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 82\r\n\r\n{\"service\": "
              "\"channel-registry\" , \"status\"  : 200 ,\"error\" "
              ":false,\"message\":  \"OK\"}",
@@ -2978,12 +2554,13 @@ Ensure(single_context_pubnub, remove_channel_group)
 Ensure(single_context_pubnub, remove_channel_group_interrupted_and_accomplished)
 {
     pubnub_init(pbp, "publ-blue", "sub-blue");
+    pubnub_set_user_id(pbp, "test_id");
     /* With auth */
     pubnub_set_auth(pbp, "sky");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v1/channel-registration/sub-key/sub-blue/"
                              "channel-group/group/"
-                             "remove?pnsdk=unit-test-0.1&auth=sky");
+                             "remove?pnsdk=unit-test-0.1&uuid=test_id&auth=sky");
     incoming("HTTP/1.1 200\r\nContent-Len", NULL);
     /* won't close connection */
     incoming("", NULL);
@@ -3012,12 +2589,13 @@ Ensure(single_context_pubnub, remove_channel_group_interrupted_and_accomplished)
 Ensure(single_context_pubnub, list_channel_group)
 {
     pubnub_init(pbp, "publ-science", "sub-science");
+    pubnub_set_user_id(pbp, "test_id");
     /* With auth */
     pubnub_set_auth(pbp, "research");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v1/channel-registration/sub-key/sub-science/"
                              "channel-group/"
-                             "info?pnsdk=unit-test-0.1&auth=research");
+                             "info?pnsdk=unit-test-0.1&uuid=test_id&auth=research");
     incoming("HTTP/1.1 200\r\nContent-Length: 154\r\n\r\n{\"service\": "
              "\"channel-registry\" , \"status\": 200 ,\"error\" "
              ":false,\"payload\":{\"group\":\"info\",\"channels\":{\"weather\","
@@ -3040,10 +2618,11 @@ Ensure(single_context_pubnub, list_channel_group)
 Ensure(single_context_pubnub, list_channel_group_interrupted_and_accomplished)
 {
     pubnub_init(pbp, "publ-air-traffic", "sub-air-traffic");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/v1/channel-registration/sub-key/sub-air-traffic/"
-                             "channel-group/airborne?pnsdk=unit-test-0.1");
+                             "channel-group/airborne?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Len", NULL);
     /* won't close connection */
     incoming("", NULL);
@@ -3077,12 +2656,13 @@ Ensure(single_context_pubnub, list_channel_group_interrupted_and_accomplished)
 Ensure(single_context_pubnub, subscribe)
 {
     pubnub_init(pbp, "publ-magazin", "sub-magazin");
-    attest(pubnub_uuid_get(pbp), streqs(NULL));
+    pubnub_set_user_id(pbp, "test_id");
+
     attest(pubnub_auth_get(pbp), streqs(NULL));
     attest(pubnub_last_time_token(pbp), streqs("0"));
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/subscribe/sub-magazin/health/0/0?pnsdk=unit-test-0.1");
+        "/subscribe/sub-magazin/health/0/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "26\r\n\r\n[[],\"1516014978925123457\"]",
              NULL);
@@ -3099,7 +2679,7 @@ Ensure(single_context_pubnub, subscribe)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/sub-magazin/health/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "56\r\n\r\n[[pomegranate_juice,papaya,mango],"
              "\"1516714978925123457\"]",
@@ -3120,10 +2700,11 @@ Ensure(single_context_pubnub, subscribe)
 Ensure(single_context_pubnub, subscribe_channel_groups)
 {
     pubnub_init(pbp, "publ-bulletin", "sub-bulletin");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-bulletin/,/0/"
-                             "0?pnsdk=unit-test-0.1&channel-group=updates");
+                             "0?pnsdk=unit-test-0.1&channel-group=updates&uuid=test_id");
     incoming(
         "HTTP/1.1 200\r\nContent-Length: 25\r\n\r\n[[],\"251614978925123457\"]",
         NULL);
@@ -3140,7 +2721,7 @@ Ensure(single_context_pubnub, subscribe_channel_groups)
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/sub-bulletin/,/0/"
                              "251614978925123457?pnsdk=unit-test-0.1&channel-"
-                             "group=updates");
+                             "group=updates&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "110\r\n\r\n[[skype,web_brouser,text_editor],"
              "\"251624978925123457\",\"updates,updates,updates\",\"messengers,"
@@ -3165,7 +2746,7 @@ Ensure(single_context_pubnub, subscribe_channel_groups)
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/sub-bulletin/,/0/"
                              "251624978925123457?pnsdk=unit-test-0.1&channel-"
-                             "group=updates");
+                             "group=updates&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "51\r\n\r\n[[virtualbox],\"251624978925123457\",\"updates\","
              "\"VMs\"]",
@@ -3185,7 +2766,7 @@ Ensure(single_context_pubnub, subscribe_channels_and_channel_groups)
 {
     pubnub_init(pbp, "publ-key", "sub-Key");
 
-    pubnub_set_uuid(pbp, "admin");
+    pubnub_set_user_id(pbp, "admin");
     pubnub_set_auth(pbp, "msgs");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-Key/[ch1,ch2]/0/"
@@ -3198,7 +2779,7 @@ Ensure(single_context_pubnub, subscribe_channels_and_channel_groups)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_subscribe(pbp, "[ch1,ch2]", "[chgr2,chgr3,chgr4]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(5));
+    attest(pbp->core.user_id_len, equals(5));
 
     attest(pubnub_get_channel(pbp), streqs(NULL));
     attest(pubnub_get(pbp), equals(NULL));
@@ -3254,7 +2835,7 @@ Ensure(single_context_pubnub, subscribe_channels_and_channel_groups)
     attest(pubnub_get_channel(pbp), streqs("ch17"));
     attest(pubnub_get_channel(pbp), streqs(NULL));
     attest(pubnub_last_http_code(pbp), equals(200));
-    attest(pubnub_uuid_get(pbp), streqs("admin"));
+    attest(pubnub_user_id_get(pbp), streqs("admin"));
     attest(pubnub_auth_get(pbp), streqs("msgs"));
 }
 
@@ -3263,7 +2844,7 @@ Ensure(single_context_pubnub,
 {
     pubnub_init(pbp, "publ-measurements", "sub-measurements");
 
-    pubnub_set_uuid(pbp, "technician");
+    pubnub_set_user_id(pbp, "technician");
     pubnub_set_auth(pbp, "weather-conditions");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-measurements/,/0/"
@@ -3279,7 +2860,7 @@ Ensure(single_context_pubnub,
     attest(pubnub_subscribe(
                pbp, NULL, "[air-temperature,humidity,wind-speed-and-direction,pressure]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(10));
+    attest(pbp->core.user_id_len, equals(10));
 
     attest(pubnub_get(pbp), equals(NULL));
     attest(pubnub_get_channel(pbp), streqs(NULL));
@@ -3376,17 +2957,19 @@ Ensure(single_context_pubnub,
 Ensure(single_context_pubnub, subscribe_no_channel_and_no_channelgroups)
 {
     pubnub_init(pbp, "publ-something", "sub-something");
+    pubnub_set_user_id(pbp, "test_id");
     attest(pubnub_subscribe(pbp, NULL, NULL), equals(PNR_INVALID_CHANNEL));
 }
 
 Ensure(single_context_pubnub, subscribe_parse_response_format_error)
 {
     pubnub_init(pbp, "publ-fe", "sub-fe");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-fe/[ch2]/0/"
                              "0?pnsdk=unit-test-0.1&channel-group=[chgr2,"
-                             "chgr4]");
+                             "chgr4]&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "26\r\n\r\n{[],\"3516149789251234578\"}",
              NULL);
@@ -3400,7 +2983,7 @@ Ensure(single_context_pubnub, subscribe_reestablishing_broken_keep_alive_conecti
 {
     pubnub_init(pbp, "publ-key", "sub-Key");
 
-    pubnub_set_uuid(pbp, "admin");
+    pubnub_set_user_id(pbp, "admin");
     pubnub_set_auth(pbp, "msgs");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-Key/[ch1,ch2]/0"
@@ -3413,7 +2996,7 @@ Ensure(single_context_pubnub, subscribe_reestablishing_broken_keep_alive_conecti
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     attest(pubnub_subscribe(pbp, "[ch1,ch2]", "[chgr2,chgr3,chgr4]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(5));
+    attest(pbp->core.user_id_len, equals(5));
 
     attest(pubnub_get_channel(pbp), streqs(NULL));
     attest(pubnub_get(pbp), equals(NULL));
@@ -3490,7 +3073,7 @@ Ensure(single_context_pubnub, subscribe_not_using_keep_alive_connection)
     /* Shouldn't make any difference having set these parameters */
     pubnub_set_keep_alive_param(pbp, 49, 50);
 
-    pubnub_set_uuid(pbp, "admin");
+    pubnub_set_user_id(pbp, "admin");
     pubnub_set_auth(pbp, "msgs");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-Key/[ch1,ch2]/0/"
@@ -3501,7 +3084,7 @@ Ensure(single_context_pubnub, subscribe_not_using_keep_alive_connection)
                        NULL);
     attest(pubnub_subscribe(pbp, "[ch1,ch2]", "[chgr2,chgr3,chgr4]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(5));
+    attest(pbp->core.user_id_len, equals(5));
 
     attest(pubnub_get_channel(pbp), streqs(NULL));
     attest(pubnub_get(pbp), equals(NULL));
@@ -3515,7 +3098,7 @@ Ensure(single_context_pubnub, subscribe_not_using_and_than_using_keep_alive_conn
     /* Won't be using default 'keep-alive' connection */
     pubnub_dont_use_http_keep_alive(pbp);
 
-    pubnub_set_uuid(pbp, "admin");
+    pubnub_set_user_id(pbp, "admin");
     pubnub_set_auth(pbp, "msgs");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-Key/[ch1,ch2]/0/"
@@ -3526,7 +3109,7 @@ Ensure(single_context_pubnub, subscribe_not_using_and_than_using_keep_alive_conn
                        NULL);
     attest(pubnub_subscribe(pbp, "[ch1,ch2]", "[chgr2,chgr3,chgr4]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(5));
+    attest(pbp->core.user_id_len, equals(5));
 
     attest(pubnub_get_channel(pbp), streqs(NULL));
     attest(pubnub_get(pbp), equals(NULL));
@@ -3611,7 +3194,8 @@ Ensure(single_context_pubnub, subscribe_not_using_and_than_using_keep_alive_conn
 Ensure(single_context_pubnub, keeps_connection_alive_for_certain_number_of_operations)
 {
     pubnub_init(pbp, "publ-persian", "sub-persian");
-    attest(pubnub_uuid_get(pbp), streqs(NULL));
+    pubnub_set_user_id(pbp, "test_id");
+
     attest(pubnub_auth_get(pbp), streqs(NULL));
     attest(pubnub_last_time_token(pbp), streqs("0"));
 
@@ -3620,7 +3204,7 @@ Ensure(single_context_pubnub, keeps_connection_alive_for_certain_number_of_opera
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/subscribe/sub-persian/civilization/0/0?pnsdk=unit-test-0.1");
+        "/subscribe/sub-persian/civilization/0/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "26\r\n\r\n[[],\"1516014978925123458\"]",
              NULL);
@@ -3640,7 +3224,7 @@ Ensure(single_context_pubnub, keeps_connection_alive_for_certain_number_of_opera
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/sub-persian/civilization/0/"
-                             "1516014978925123458?pnsdk=unit-test-0.1");
+                             "1516014978925123458?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "46\r\n\r\n[[\"tigris\",\"euphrates\"],\"1516014978925123459\"]",
              NULL);
@@ -3663,7 +3247,7 @@ Ensure(single_context_pubnub, keeps_connection_alive_for_certain_number_of_opera
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/publish/publ-persian/sub-persian/0/civilization/"
-                             "0/%22hanging_gardens%22?pnsdk=unit-test-0.1");
+                             "0/%22hanging_gardens%22?pnsdk=unit-test-0.1&uuid=test_id");
     incoming_and_close("HTTP/1.1 200\r\nContent-Length: "
                        "32\r\n\r\n[1,\"Sent\",\"1516014978925123459\"]",
                        NULL);
@@ -3675,7 +3259,7 @@ Ensure(single_context_pubnub, keeps_connection_alive_for_certain_number_of_opera
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-persian/civilization/0/"
-                             "1516014978925123459?pnsdk=unit-test-0.1");
+                             "1516014978925123459?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: 61\r\n\r\n[[\"hanging_gardens\", "
              "\"arabian_nights\"],\"1516714978925123460\"]",
              NULL);
@@ -3695,7 +3279,8 @@ Ensure(single_context_pubnub,
        doesnt_keep_connection_alive_confinement_number_of_operations)
 {
     pubnub_init(pbp, "publ-some", "sub-some");
-    attest(pubnub_uuid_get(pbp), streqs(NULL));
+    pubnub_set_user_id(pbp, "test_id");
+
     attest(pubnub_auth_get(pbp), streqs(NULL));
     attest(pubnub_last_time_token(pbp), streqs("0"));
 
@@ -3704,7 +3289,7 @@ Ensure(single_context_pubnub,
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/subscribe/sub-some/light/0/0?pnsdk=unit-test-0.1");
+        "/subscribe/sub-some/light/0/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming_and_close("HTTP/1.1 200\r\nContent-Length: "
                        "26\r\n\r\n[[],\"1516014978925123458\"]",
                        NULL);
@@ -3721,7 +3306,7 @@ Ensure(single_context_pubnub,
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/subscribe/sub-some/light/0/1516014978925123458?pnsdk=unit-test-0.1");
+        "/subscribe/sub-some/light/0/1516014978925123458?pnsdk=unit-test-0.1&uuid=test_id");
     incoming_and_close("HTTP/1.1 200\r\nContent-Length: "
                        "35\r\n\r\n[[warm,cold],\"1516014978925123459\"]",
                        NULL);
@@ -3739,7 +3324,8 @@ Ensure(single_context_pubnub,
 Ensure(single_context_pubnub, keep_alive_connection_closes_time_runs_out)
 {
     pubnub_init(pbp, "publ-some", "sub-some");
-    attest(pubnub_uuid_get(pbp), streqs(NULL));
+    pubnub_set_user_id(pbp, "test_id");
+
     attest(pubnub_auth_get(pbp), streqs(NULL));
     attest(pubnub_last_time_token(pbp), streqs("0"));
 
@@ -3748,7 +3334,7 @@ Ensure(single_context_pubnub, keep_alive_connection_closes_time_runs_out)
 
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/subscribe/sub-some/discharge/0/0?pnsdk=unit-test-0.1");
+        "/subscribe/sub-some/discharge/0/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "26\r\n\r\n[[],\"1516014978925123458\"]",
              NULL);
@@ -3767,7 +3353,7 @@ Ensure(single_context_pubnub, keep_alive_connection_closes_time_runs_out)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/sub-some/discharge/0/"
-                             "1516014978925123458?pnsdk=unit-test-0.1");
+                             "1516014978925123458?pnsdk=unit-test-0.1&uuid=test_id");
     incoming_and_close("HTTP/1.1 200\r\nContent-Length: "
                        "35\r\n\r\n[[lightning],\"1516014978925123459\"]",
                        NULL);
@@ -3785,6 +3371,7 @@ Ensure(single_context_pubnub,
        subscribe_not_using_keep_alive_and_than_using_it_again_with_parameters)
 {
     pubnub_init(pbp, "publ-key", "sub-Key");
+    pubnub_set_user_id(pbp, "test_id");
 
     /* Won't be using default 'keep-alive' connection */
     pubnub_dont_use_http_keep_alive(pbp);
@@ -3793,7 +3380,7 @@ Ensure(single_context_pubnub,
      * 'keep_alive' is off */
     pubnub_set_keep_alive_param(pbp, 5, 2);
 
-    pubnub_set_uuid(pbp, "admin");
+    pubnub_set_user_id(pbp, "admin");
     pubnub_set_auth(pbp, "msgs");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-Key/[ch1,ch2]/0/"
@@ -3804,7 +3391,7 @@ Ensure(single_context_pubnub,
                        NULL);
     attest(pubnub_subscribe(pbp, "[ch1,ch2]", "[chgr2,chgr3,chgr4]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(5));
+    attest(pbp->core.user_id_len, equals(5));
 
     attest(pubnub_get_channel(pbp), streqs(NULL));
     attest(pubnub_get(pbp), equals(NULL));
@@ -3894,7 +3481,7 @@ Ensure(single_context_pubnub, subscribe_gzip_response)
 
     pubnub_init(pbp, "publ-measurements", "sub-measurements");
 
-    pubnub_set_uuid(pbp, "technician");
+    pubnub_set_user_id(pbp, "technician");
     pubnub_set_auth(pbp, "weather-conditions");
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url("/subscribe/sub-measurements/,/0/"
@@ -3910,7 +3497,7 @@ Ensure(single_context_pubnub, subscribe_gzip_response)
     attest(pubnub_subscribe(
                pbp, NULL, "[air-temperature,humidity,wind-speed-and-direction,pressure]"),
            equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(10));
+    attest(pbp->core.user_id_len, equals(10));
 
     attest(pubnub_get(pbp), equals(NULL));
     attest(pubnub_get_channel(pbp), streqs(NULL));
@@ -3960,7 +3547,7 @@ Ensure(single_context_pubnub, subscribe_gzip_response)
     attest(pubnub_get(pbp), equals(NULL));
     attest(pubnub_last_http_code(pbp), equals(200));
 
-    pubnub_set_uuid(pbp, "bird");
+    pubnub_set_user_id(pbp, "bird");
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/v2/presence/sub-key/sub-measurements/uuid/"
@@ -3975,7 +3562,7 @@ Ensure(single_context_pubnub, subscribe_gzip_response)
     expect(pbntf_trans_outcome, when(pb, equals(pbp)));
     /* Recognizes the uuid set from the context */
     attest(pubnub_where_now(pbp, NULL), equals(PNR_OK));
-    attest(pbp->core.uuid_len, equals(4));
+    attest(pbp->core.user_id_len, equals(4));
 
     attest(pubnub_get(pbp),
            streqs("{\"status\":200,\"message\":\"OK\",\"service\":\"Presence\","
@@ -4439,9 +4026,10 @@ Ensure(single_context_pubnub, global_here_now_gzip_response)
     struct uint8_block chunk_block3 = { 59, gzip_chunk3 };
 
     pubnub_init(pbp, "demo", "demo");
+    pubnub_set_user_id(pbp, "test_id");
 
     expect_have_dns_for_pubnub_origin();
-    expect_outgoing_with_url("/v2/presence/sub-key/demo?pnsdk=unit-test-0.1");
+    expect_outgoing_with_url("/v2/presence/sub-key/demo?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\n"
              "Content-Length: 197\r\n"
              "Content-Encoding: gzip\r\n"
@@ -4465,7 +4053,7 @@ Ensure(single_context_pubnub, global_here_now_gzip_response)
 
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
-    expect_outgoing_with_url("/v2/presence/sub-key/demo?pnsdk=unit-test-0.1");
+    expect_outgoing_with_url("/v2/presence/sub-key/demo?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\n"
              "Content-Encoding: gzip\r\n"
              "Transfer-Encoding: chunked\r\n"
@@ -4753,9 +4341,11 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     struct uint8_block extra_byte_block = { 1, &extra_byte };
 
     pubnub_init(pbp, "looking-glass", "looking-glass");
+    pubnub_set_user_id(pbp, "test_id");
+
     expect_have_dns_for_pubnub_origin();
     expect_outgoing_with_url(
-        "/subscribe/looking-glass/island/0/0?pnsdk=unit-test-0.1");
+        "/subscribe/looking-glass/island/0/0?pnsdk=unit-test-0.1&uuid=test_id");
     incoming("HTTP/1.1 200\r\nContent-Length: "
              "26\r\n\r\n[[],\"1516014978925123457\"]",
              NULL);
@@ -4769,7 +4359,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     /* Changing 'gzip' format byte into something else */
     gzip_body[1]++;
     incoming("HTTP/1.1 200\r\n"
@@ -4787,7 +4377,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     gzip_body[2]--;
     body_block.size = sizeof gzip_body;
     incoming("HTTP/1.1 200\r\n"
@@ -4807,7 +4397,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     gzip_body[3]++;
     body_block.size = sizeof gzip_body;
     incoming("HTTP/1.1 200\r\n"
@@ -4825,7 +4415,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     body_block.size = sizeof gzip_body - 1;
     incoming("HTTP/1.1 200\r\n"
              "Content-Length: 62\r\n"
@@ -4841,7 +4431,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     body_block.size = sizeof gzip_body;
     incoming("HTTP/1.1 200\r\n"
              "Content-Length: 64\r\n"
@@ -4860,7 +4450,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     gzip_body[sizeof gzip_body - 4]--;
     body_block.size = sizeof gzip_body;
     incoming("HTTP/1.1 200\r\n"
@@ -4879,7 +4469,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     gzip_body[sizeof gzip_body - 4]++;
     body_block.size = sizeof gzip_body;
     incoming("HTTP/1.1 200\r\n"
@@ -4897,7 +4487,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     gzip_body[30]--;
     gzip_body[32]--;
     gzip_body[34]--;
@@ -4921,7 +4511,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925123457?pnsdk=unit-test-0.1");
+                             "1516014978925123457?pnsdk=unit-test-0.1&uuid=test_id");
     body_block.size = sizeof gzip_body;
     incoming("HTTP/1.1 200\r\n"
              "Content-Length: 63\r\n"
@@ -4944,7 +4534,7 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
     expect(pbntf_enqueue_for_processing, when(pb, equals(pbp)), returns(0));
     expect(pbntf_got_socket, when(pb, equals(pbp)), returns(0));
     expect_outgoing_with_url("/subscribe/looking-glass/island/0/"
-                             "1516014978925323471?pnsdk=unit-test-0.1");
+                             "1516014978925323471?pnsdk=unit-test-0.1&uuid=test_id");
     body_block.size = sizeof gzip_body;
     incoming("HTTP/1.1 200\r\n"
              "Content-Length: 63\r\n"
@@ -4958,7 +4548,6 @@ Ensure(single_context_pubnub, gzip_bad_compression_format)
 }
 
 /* Verify ASSERT gets fired */
-
 Ensure(single_context_pubnub, illegal_context_fires_assert)
 {
 #if PUBNUB_USE_ADVANCED_HISTORY
@@ -4977,9 +4566,14 @@ Ensure(single_context_pubnub, illegal_context_fires_assert)
     expect_assert_in(pubnub_subscribe(NULL, "x", NULL), "pubnub_pubsubapi.c");
     expect_assert_in(pubnub_leave(NULL, "x", NULL), "pubnub_coreapi.c");
     expect_assert_in(pubnub_cancel(NULL), "pubnub_pubsubapi.c");
+    expect_assert_in(pubnub_set_user_id(NULL, ""), "pubnub_pubsubapi.c");
+    expect_assert_in(pubnub_set_user_id(pbp, "50fb7a0b-1688-45b9-9f27-ea83308464d8-ab3817df-07eb-446a-b990-c3b62a31706f"), "pubnub_ccore_pubsub.c");
+    PUBNUB_DISABLE_WARNING_PUSH
+    PUBNUB_DISABLE_DEPRECATED
     expect_assert_in(pubnub_set_uuid(NULL, ""), "pubnub_pubsubapi.c");
     expect_assert_in(pubnub_set_uuid(pbp, "50fb7a0b-1688-45b9-9f27-ea83308464d8-ab3817df-07eb-446a-b990-c3b62a31706f"), "pubnub_ccore_pubsub.c");
-    expect_assert_in(pubnub_uuid_get(NULL), "pubnub_pubsubapi.c");
+    PUBNUB_DISABLE_WARNING_POP
+    expect_assert_in(pubnub_user_id_get(NULL), "pubnub_pubsubapi.c");
     expect_assert_in(pubnub_set_auth(NULL, ""), "pubnub_pubsubapi.c");
     expect_assert_in(pubnub_auth_get(NULL), "pubnub_pubsubapi.c");
     expect_assert_in(pubnub_last_http_code(NULL), "pubnub_pubsubapi.c");
@@ -5014,6 +4608,9 @@ Ensure(single_context_pubnub, illegal_context_fires_assert)
     expect_assert_in(pubnub_get_origin(NULL), "pubnub_pubsubapi.c");
     expect_assert_in(pubnub_free((pubnub_t*)((char*)pbp + 10000)),
                      "pubnub_alloc_static.c");
+#if PUBNUB_USE_ACTIONS_API
+    expect_assert_in(pubnub_parse_token(pbp, NULL), "pubnub_grant_token_api.c");
+#endif
 #if PUBNUB_USE_ADVANCED_HISTORY
     expect_assert_in(pubnub_get_error_message(NULL, o_msg), "pubnub_advanced_history.c");
     expect_assert_in(pubnub_get_chan_msg_counts_size(NULL), "pubnub_advanced_history.c");

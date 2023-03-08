@@ -1,4 +1,4 @@
-SOURCEFILES = ../core/pubnub_pubsubapi.c ../core/pubnub_coreapi.c ../core/pubnub_coreapi_ex.c ../core/pubnub_ccore_pubsub.c ../core/pubnub_ccore.c ../core/pubnub_netcore.c  ../lib/sockets/pbpal_sockets.c ../lib/sockets/pbpal_resolv_and_connect_sockets.c ../lib/sockets/pbpal_handle_socket_error.c ../core/pubnub_alloc_std.c ../core/pubnub_assert_std.c ../core/pubnub_generate_uuid.c ../core/pubnub_blocking_io.c ../posix/posix_socket_blocking_io.c ../core/pubnub_timers.c ../core/pubnub_json_parse.c ../lib/md5/md5.c ../lib/base64/pbbase64.c ../lib/pb_strnlen_s.c ../lib/pb_strncasecmp.c ../core/pubnub_helper.c pubnub_version_posix.cpp ../posix/pubnub_generate_uuid_posix.c ../posix/pbpal_posix_blocking_io.c ../core/pubnub_free_with_timeout_std.c pubnub_subloop.cpp ../posix/msstopwatch_monotonic_clock.c ../posix/pbtimespec_elapsed_ms.c ../core/pubnub_url_encode.c ../core/pubnub_memory_block.c ../posix/pb_sleep_ms.c
+SOURCEFILES = ../core/pbcc_set_state.c ../core/pubnub_pubsubapi.c ../core/pubnub_coreapi.c ../core/pubnub_coreapi_ex.c ../core/pubnub_ccore_pubsub.c ../core/pubnub_ccore.c ../core/pubnub_netcore.c  ../lib/sockets/pbpal_sockets.c ../lib/sockets/pbpal_resolv_and_connect_sockets.c ../lib/sockets/pbpal_handle_socket_error.c ../core/pubnub_alloc_std.c ../core/pubnub_assert_std.c ../core/pubnub_generate_uuid.c ../core/pubnub_blocking_io.c ../posix/posix_socket_blocking_io.c ../core/pubnub_timers.c ../core/pubnub_json_parse.c ../lib/md5/md5.c ../lib/base64/pbbase64.c ../lib/pb_strnlen_s.c ../lib/pb_strncasecmp.c ../core/pubnub_helper.c pubnub_version_posix.cpp ../posix/pubnub_generate_uuid_posix.c ../posix/pbpal_posix_blocking_io.c ../core/pubnub_free_with_timeout_std.c pubnub_subloop.cpp ../posix/msstopwatch_monotonic_clock.c ../posix/pbtimespec_elapsed_ms.c ../core/pubnub_url_encode.c ../core/pubnub_memory_block.c ../posix/pb_sleep_ms.c
 
 ifndef ONLY_PUBSUB_API
 ONLY_PUBSUB_API = 0
@@ -171,4 +171,5 @@ fntest_runner: fntest/pubnub_fntest_runner.cpp $(SOURCEFILES) $(SYNC_INTF_SOURCE
 
 
 clean:
-	rm pubnub_sync_sample pubnub_callback_sample pubnub_callback_cpp11_sample pubnub_callback_subloop_sample pubnub_callback_cpp11_subloop_sample cancel_subscribe_sync_sample subscribe_publish_callback_sample futres_nesting_sync pubnub_sync_subloop_sample futres_nesting_callback futres_nesting_callback_cpp11 fntest_runner *.dSYM
+	find . -type d -iname "*.dSYM" -exec rm -rf {} \+
+	find . -type f ! -name "*.*" -o -name "*.a" -o -name "*.o" | xargs -r rm -rf

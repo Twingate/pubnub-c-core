@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 #include "pubnub_config.h"
+#include "lib/pb_deprecated.h"
 #include "core/pubnub_alloc.h"
 #include "core/pubnub_pubsubapi.h"
 #include "core/pubnub_coreapi.h"
@@ -390,6 +391,51 @@ public:
     pubnub_history_options data() { return d_; }
 };
 
+/** A wrapper class for set_state options, enabling a nicer
+    usage. Something like:
+
+        pn.set_state(chan, state, pubnub::set_state_options().heartbeat(true));
+*/
+
+class set_state_options {
+    pubnub_set_state_options d_;
+    std::string d_channel_group;
+    std::string d_user_id;
+
+public:
+    set_state_options() : d_(pubnub_set_state_options()) {}
+
+    set_state_options& channel_group(std::string const& channel_group)
+    {
+        d_channel_group = channel_group;
+        d_.channel_group = d_channel_group.empty() ? 0 : d_channel_group.c_str();
+
+        return *this;
+    }
+
+    set_state_options& channel_group(std::vector<std::string> const& channel_groups)
+    {
+        return channel_group(join(channel_groups));
+    }
+
+    set_state_options& user_id(std::string const& user_id)
+    {
+        d_user_id = user_id;
+        d_.user_id = d_user_id.empty() ? 0 : d_user_id.c_str();
+
+        return *this;
+    }
+
+    set_state_options& heartbeat(bool heartbeat)
+    {
+        d_.heartbeat = heartbeat;
+
+        return *this;
+    }
+
+    pubnub_set_state_options data() { return d_; }
+};
+
 #if PUBNUB_USE_OBJECTS_API
 /** A wrapper class for objects api managing include parameter */
 class include_options {
@@ -632,30 +678,59 @@ public:
         lock_guard lck(d_mutex);
         return d_auth_token;
     }
+    
+    /** sets the user_id to @p uuid. if @p uuid is an empty string,
+      user_id will not be used.
 
-    /** Sets the UUID to @p uuid. If @p uuid is an empty string,
-        UUID will not be used.
-        @see pubnub_set_uuid
-     */
-    void set_uuid(std::string const& uuid)
+      @deprecated this is provided as a workaround for existing users.
+      Please use `set_user_id` instead.
+
+      @see pubnub_set_user_id
+      */
+    PUBNUB_DEPRECATED void set_uuid(std::string const& uuid)
     {
-        pubnub_set_uuid(d_pb, uuid.empty() ? NULL : uuid.c_str());
+        set_user_id(uuid);
     }
-    /// Set the UUID to a random-generated one
+
+    /** sets the user_id to @p user_id. if @p user_id is an empty string,
+      user_id will not be used.
+
+      @see pubnub_set_user_id
+      */
+    void set_user_id(std::string const& user_id)
+    {
+        pubnub_set_user_id(d_pb, user_id.empty() ? NULL : user_id.c_str());
+    }
+
+    /// Set the user_id with a random-generated UUID
+    /// 
+    /// @deprecated random generated uuid/user_id is deprecated.
+    ///
     /// @see pubnub_generate_uuid_v4_random
-    int set_uuid_v4_random()
+    PUBNUB_DEPRECATED int set_uuid_v4_random() 
     {
         struct Pubnub_UUID uuid;
         if (0 != pubnub_generate_uuid_v4_random(&uuid)) {
             return -1;
         }
-        set_uuid(pubnub_uuid_to_string(&uuid).uuid);
+        set_user_id(pubnub_uuid_to_string(&uuid).uuid);
         return 0;
     }
-    /// Returns the current UUID
-    std::string const uuid() const
+
+    /** Returns the current user_id
+
+      @deprecated this is provided as a workaround for existing users.
+      Please use `user_id` instead.
+      */
+    PUBNUB_DEPRECATED std::string const uuid() const
     {
-        char const* uuid = pubnub_uuid_get(d_pb);
+        return user_id();
+    }
+
+    /// Returns the current user_id
+    std::string const user_id() const
+    {
+        char const* uuid = pubnub_user_id_get(d_pb);
         return std::string((NULL == uuid) ? "" : uuid);
     }
 
@@ -1103,6 +1178,30 @@ public:
         return set_state(join(channel), join(channel_group), uuid, state);
     }
 
+    /// Starts a transaction to set the @p state JSON object with selected 
+    /// @options for the given @p channel and/or channel groups chosen 
+    /// in options.
+    /// @see pubnub_set_state_ex
+    futres set_state(std::string const& channel,
+                     std::string const& state,
+                     set_state_options options)
+    {
+        char const* ch = channel.empty() ? 0 : channel.c_str();
+        return doit(pubnub_set_state_ex(d_pb, ch, state.c_str(), options.data()));
+    }
+    
+    /// Starts a transaction to set the @p state JSON object with selected 
+    /// @options for the given @p channels passed as a vector and/or channel
+    /// groups chosen in options.
+    /// @see pubnub_set_state_ex
+    futres set_state(std::vector<std::string> const& channel,
+                     std::string const& state,
+                     set_state_options options)
+    {
+        return set_state(join(channel), state, options);
+    }
+
+
     /// Starts a transaction to get the state JSON object for the
     /// given @p channel and/or @p channel_group of the given @p
     /// uuid.
@@ -1194,11 +1293,11 @@ public:
     /// @see pubnub_grant_token
     std::string parse_token(std::string const& token)
     {
-	char* parsed_token_chars = pubnub_parse_token(d_pb, token.c_str());
+    	char* parsed_token_chars = pubnub_parse_token(d_pb, token.c_str());
         std::string owned_parsed_token(parsed_token_chars);
-	
-	::free(parsed_token_chars);
-	return owned_parsed_token; 
+    	
+    	::free(parsed_token_chars);
+    	return owned_parsed_token; 
     }
 #endif
 
@@ -1776,8 +1875,6 @@ private:
     std::string d_auth;
     /// The auth token containing pam permissions
     std::string d_auth_token;
-    /// The UUID
-    std::string d_uuid;
     /// The origin set last time (doen't have to be the one used,
     /// the default can be used instead)
     std::string d_origin;

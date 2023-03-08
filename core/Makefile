@@ -1,6 +1,7 @@
-PROJECT_SOURCEFILES = pubnub_pubsubapi.c pubnub_coreapi.c pubnub_ccore_pubsub.c pubnub_ccore.c pubnub_netcore.c pubnub_alloc_static.c pubnub_assert_std.c pubnub_json_parse.c pubnub_keep_alive.c pubnub_helper.c pubnub_url_encode.c ../lib/pb_strnlen_s.c ../lib/pb_strncasecmp.c  
+PROJECT_SOURCEFILES = pbcc_set_state.c pubnub_pubsubapi.c pubnub_coreapi.c pubnub_ccore_pubsub.c pubnub_ccore.c pubnub_netcore.c pubnub_alloc_static.c pubnub_assert_std.c pubnub_json_parse.c pubnub_keep_alive.c pubnub_helper.c pubnub_url_encode.c ../lib/pb_strnlen_s.c ../lib/pb_strncasecmp.c ../lib/base64/pbbase64.c pubnub_coreapi_ex.c
+# TODO: move coreapi_ex to new module
 
-all: pubnub_proxy_unittest pubnub_timer_list_unittest unittest
+all: pubnub_grant_token_api_unittest pubnub_proxy_unittest pubnub_timer_list_unittest unittest
 
 OS := $(shell uname)
 # Coverage doesn't seem to work on MacOS for some reason, but, since
@@ -47,11 +48,14 @@ CFLAGS +=-g -D PUBNUB_ADVANCED_KEEP_ALIVE=1 -D PUBNUB_LOG_LEVEL=PUBNUB_LOG_LEVEL
 LDFLAGS=-L../cgreen/build/src
 
 CGREEN_RUNNER=../cgreen/build/tools/cgreen-runner
+
+
 unittest: $(PROJECT_SOURCEFILES) pubnub_core_unit_test.c
-	gcc -o pubnub_core_unit_test.so -shared $(CFLAGS) $(LDFLAGS) -D PUBNUB_ORIGIN_SETTABLE=1 -Wall $(COVERAGE_FLAGS) -fPIC $(PROJECT_SOURCEFILES) pubnub_core_unit_test.c -lcgreen -lm
+	gcc -o pubnub_core_unit_test.so -shared $(CFLAGS) $(LDFLAGS) -D PUBNUB_ORIGIN_SETTABLE=1 -Wall $(COVERAGE_FLAGS) -fPIC $(PROJECT_SOURCEFILES) test/pubnub_test_mocks.c pubnub_core_unit_test.c -lcgreen -lm
 #	gcc -o pubnub_core_unit_testo  $(CFLAGS) -Wall $(COVERAGE_FLAGS) $(PROJECT_SOURCEFILES) pubnub_core_unit_test.c -lcgreen -lm
 	$(CGREEN_RUNNER) ./pubnub_core_unit_test.so
 	#$(GCOVR) -r . --html --html-details -o coverage.html
+
 
 TIMER_LIST_SOURCEFILES = pubnub_alloc_static.c pubnub_assert_std.c pubnub_timers.c
 
@@ -61,12 +65,24 @@ pubnub_timer_list_unittest: pubnub_timer_list.c pubnub_timer_list_unit_test.c
 	$(CGREEN_RUNNER) ./pubnub_timer_list_unit_test.so
 	#$(GCOVR) -r . --html --html-details -o coverage.html
 
-PROXY_PROJECT_SOURCEFILES = pubnub_proxy_core.c pubnub_proxy.c pbhttp_digest.c pbntlm_core.c pbntlm_packer_std.c pubnub_generate_uuid_v4_random_std.c ../lib/pubnub_parse_ipv4_addr.c ../lib/pubnub_parse_ipv6_addr.c ../lib/base64/pbbase64.c ../lib/md5/md5.c
+
+PROXY_PROJECT_SOURCEFILES = pubnub_proxy_core.c pubnub_proxy.c pbhttp_digest.c pbntlm_core.c pbntlm_packer_std.c pubnub_generate_uuid_v4_random_std.c ../lib/pubnub_parse_ipv4_addr.c ../lib/pubnub_parse_ipv6_addr.c  ../lib/md5/md5.c
 
 pubnub_proxy_unittest: $(PROJECT_SOURCEFILES) $(PROXY_PROJECT_SOURCEFILES) pubnub_proxy_unit_test.c
 	gcc -o pubnub_proxy_unit_test.so -shared $(CFLAGS) $(LDFLAGS) -D PUBNUB_CALLBACK_API -D PUBNUB_PROXY_API=1 -Wall $(COVERAGE_FLAGS) -fPIC $(PROJECT_SOURCEFILES) $(PROXY_PROJECT_SOURCEFILES) pubnub_proxy_unit_test.c -lcgreen -lm
 	$(CGREEN_RUNNER) ./pubnub_proxy_unit_test.so
 	#$(GCOVR) -r . --html --html-details -o coverage.html
 
+
+GRANT_TOKEN_SOURCEFILES +=  ../lib/cbor/cborparser.c ../lib/cbor/cborparser_dup_string.c pbcc_grant_token_api.c pubnub_grant_token_api.c
+
+pubnub_grant_token_api_unittest: $(PROJECT_SOURCEFILES) $(GRANT_TOKEN_SOURCEFILES) pubnub_grant_token_api_unit_tests.c
+	gcc -o pubnub_grant_token_api_unit_test.so -shared $(CFLAGS) $(LDFLAGS) -D PUBNUB_USE_GRANT_TOKEN_API=1 -Wall $(COVERAGE_FLAGS) -fPIC $(PROJECT_SOURCEFILES) $(GRANT_TOKEN_SOURCEFILES) test/pubnub_test_mocks.c pubnub_grant_token_api_unit_tests.c -lcgreen -lm
+#	gcc -o pubnub_core_unit_testo  $(CFLAGS) -Wall $(COVERAGE_FLAGS) $(PROJECT_SOURCEFILES) pubnub_core_unit_test.c -lcgreen -lm
+	$(CGREEN_RUNNER) ./pubnub_grant_token_api_unit_test.so
+	#$(GCOVR) -r . --html --html-details -o coverage.html
+
+
 clean:
-	rm pubnub_core_unit_test.so pubnub_timer_list_unit_test.so pubnub_proxy_unit_test.so *.gcda *.gcno *.html
+	find . -type d -iname "*.dSYM" -exec rm -rf {} \+
+	find . -type f -name "*.so" -o -name "*.gcda" -o -name "*.gcno" -o -name "*.html" | xargs -r rm -rf
