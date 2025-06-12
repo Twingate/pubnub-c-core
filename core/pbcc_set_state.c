@@ -42,7 +42,7 @@ void pbcc_adjust_state(struct pbcc_context* core,
 
     int buff_size = ((tot_ch + tot_cg) * strlen(state)) + (channel ? strlen(channel) : 1) + (channel_group ? strlen(channel_group) : 1) + 20;
     char * json_state = (char*)malloc(buff_size);
-    if (core->state != NULL && buff_size != sizeof(core->state)){
+    if (core->state != NULL){
         core->state = (char*)realloc((char*)core->state, buff_size);
     }
     else if (core->state == NULL){
@@ -60,23 +60,27 @@ void pbcc_adjust_state(struct pbcc_context* core,
             bool end = false;
             do{
                 ch_temp = strchr(str_ch,',');
-                if (ch_cnt > 0) { 
-                    memcpy(json_state + mem_len, ",", cm_len);
-                    mem_len += cm_len;
-                }
                 if (ch_temp == NULL) { end = true; ch_len = strlen(str_ch); }
                 else { ch_len = ch_temp - str_ch; }
 
-                if (ch_len == 0) { continue; }
+                if (ch_len > 0) {
+                    if (ch_cnt > 0) {
+                        memcpy(json_state + mem_len, ",", cm_len);
+                        mem_len += cm_len;
+                    }
 
-                char* curr_ch = (char*)malloc(ch_len + 1);
-                strcpy(curr_ch, str_ch);
+                    char* curr_ch = (char*)malloc(ch_len + 1);
+                    strncpy(curr_ch, str_ch, ch_len);
+                    curr_ch[ch_len] = '\0';
 
-                mem_len = json_kvp_builder(json_state, mem_len, curr_ch, (char*)state);
+                    mem_len = json_kvp_builder(json_state, mem_len, curr_ch, (char*)state);
 
-                ch_cnt++;
-                str_ch = ch_temp + 1;
-                free(curr_ch);
+                    ch_cnt++;
+                    free(curr_ch);
+                }
+
+                if (!end) { str_ch = ch_temp + 1; }
+
             } while (false == end);
         }
 
@@ -87,23 +91,27 @@ void pbcc_adjust_state(struct pbcc_context* core,
             bool end = false;
             do{
                 cg_temp = strchr(str_cg,',');
-                if (ch_cnt > 0 || cg_cnt > 0) { 
-                    memcpy(json_state + mem_len, ",", cm_len);
-                    mem_len += cm_len;
-                }
                 if (cg_temp == NULL) { end = true; cg_len = strlen(str_cg); }
                 else { cg_len = cg_temp - str_cg; }
 
-                if (cg_len == 0) { continue; }
+                if (cg_len > 0) {
+                    if (ch_cnt > 0 || cg_cnt > 0) {
+                        memcpy(json_state + mem_len, ",", cm_len);
+                        mem_len += cm_len;
+                    }
 
-                char* curr_cg = (char*)malloc(cg_len + 1);
-                strcpy(curr_cg, str_cg);
+                    char* curr_cg = (char*)malloc(cg_len + 1);
+                    strncpy(curr_cg, str_cg, cg_len);
+                    curr_cg[cg_len] = '\0';
 
-                mem_len = json_kvp_builder(json_state, mem_len, curr_cg, (char*)state);
+                    mem_len = json_kvp_builder(json_state, mem_len, curr_cg, (char*)state);
 
-                cg_cnt++;
-                str_cg = cg_temp + 1;
-                free(curr_cg);
+                    cg_cnt++;
+                    free(curr_cg);
+                }
+
+                if (!end) { str_cg = cg_temp + 1; }
+
             } while (false == end);
         }
 
