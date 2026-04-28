@@ -5,8 +5,10 @@
 
 #include "pubnub_assert.h"
 
+#ifndef _WIN32
 #include <stdio.h>
 #include <pthread.h>
+#endif
 
 
 void pbpal_ntf_callback_queue_init(struct pbpal_ntf_callback_queue* queue)
@@ -106,17 +108,23 @@ void pbpal_ntf_callback_process_queue(struct pbpal_ntf_callback_queue* queue)
             pubnub_mutex_unlock(queue->monitor);
             pubnub_mutex_lock(pbp->monitor);
             if (pbp->state == PBS_NULL) {
+#ifndef _WIN32
                 fprintf(stderr, "[PB-DBG] watcher: free_at_last pb=%p tid=%lu\n",
                         (void*)pbp, (unsigned long)pthread_self());
+#endif
                 pubnub_mutex_unlock(pbp->monitor);
                 pballoc_free_at_last(pbp);
             }
             else {
+#ifndef _WIN32
                 fprintf(stderr, "[PB-DBG] watcher: about to fsm pb=%p state=%d tid=%lu\n",
                         (void*)pbp, (int)pbp->state, (unsigned long)pthread_self());
+#endif
                 pbnc_fsm(pbp);
+#ifndef _WIN32
                 fprintf(stderr, "[PB-DBG] watcher: fsm done   pb=%p state=%d tid=%lu\n",
                         (void*)pbp, (int)pbp->state, (unsigned long)pthread_self());
+#endif
                 pubnub_mutex_unlock(pbp->monitor);
             }
             pubnub_mutex_lock(queue->monitor);

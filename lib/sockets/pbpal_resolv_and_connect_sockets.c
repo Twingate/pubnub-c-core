@@ -15,7 +15,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 
 #if defined(_WIN32)
 #include "windows/pubnub_get_native_socket.h"
@@ -1108,6 +1110,7 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
     PUBNUB_ASSERT(pb_valid_ctx_ptr(pb));
     PUBNUB_ASSERT_OPT(pb->state == PBS_WAIT_CONNECT);
 
+#ifndef _WIN32
     fprintf(stderr,
             "[PB-DBG] check_connect ENTER pb=%p sock=%d state=%d "
 #if PUBNUB_USE_MULTIPLE_ADDRESSES
@@ -1127,6 +1130,7 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
 #endif
 #endif
             (unsigned long)pthread_self());
+#endif
 
 #if defined(_WIN32)
     rslt = getsockopt(

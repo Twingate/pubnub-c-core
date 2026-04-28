@@ -10,7 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 
 
 #if defined PUBNUB_ASSERT_LEVEL_EX
@@ -112,16 +114,20 @@ pubnub_t* pubnub_alloc(void)
 {
     pubnub_t* pb = (pubnub_t*)malloc(sizeof(pubnub_t));
     if (pb != NULL) { save_allocated(pb); }
+#ifndef _WIN32
     fprintf(stderr, "[PB-DBG] pubnub_alloc -> pb=%p tid=%lu\n",
             (void*)pb, (unsigned long)pthread_self());
+#endif
     return pb;
 }
 
 
 void pballoc_free_at_last(pubnub_t* pb)
 {
+#ifndef _WIN32
     fprintf(stderr, "[PB-DBG] pballoc_free_at_last pb=%p tid=%lu\n",
             (void*)pb, (unsigned long)pthread_self());
+#endif
     PUBNUB_LOG_TRACE(pb, "Freeing PubNub context (final)");
 
     PUBNUB_ASSERT_OPT(pb != NULL);
@@ -153,9 +159,10 @@ int pubnub_free(pubnub_t* pb)
 {
     PUBNUB_ASSERT(pb_valid_ctx_ptr(pb));
 
+#ifndef _WIN32
     fprintf(stderr, "[PB-DBG] pubnub_free ENTER pb=%p state=%d tid=%lu\n",
             (void*)pb, (int)pb->state, (unsigned long)pthread_self());
-
+#endif
     PUBNUB_LOG_TRACE(pb, "Try to free PubNub context");
 
     if (pb->state == PBS_NULL) {
@@ -167,11 +174,15 @@ int pubnub_free(pubnub_t* pb)
     }
 
     pubnub_mutex_lock(pb->monitor);
+#ifndef _WIN32
     fprintf(stderr, "[PB-DBG] pubnub_free locked pb=%p state=%d tid=%lu\n",
             (void*)pb, (int)pb->state, (unsigned long)pthread_self());
+#endif
     pbnc_stop(pb, PNR_CANCELLED);
+#ifndef _WIN32
     fprintf(stderr, "[PB-DBG] pubnub_free post-stop pb=%p state=%d tid=%lu\n",
             (void*)pb, (int)pb->state, (unsigned long)pthread_self());
+#endif
     if (PBS_IDLE == pb->state) {
         PUBNUB_LOG_TRACE(pb, "PubNub context is in idle state. Freeing...");
         pubnub_disable_auto_heartbeat(pb);
