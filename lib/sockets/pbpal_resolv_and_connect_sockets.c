@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <pthread.h>
 
 #if defined(_WIN32)
 #include "windows/pubnub_get_native_socket.h"
@@ -1107,6 +1108,26 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
     PUBNUB_ASSERT(pb_valid_ctx_ptr(pb));
     PUBNUB_ASSERT_OPT(pb->state == PBS_WAIT_CONNECT);
 
+    fprintf(stderr,
+            "[PB-DBG] check_connect ENTER pb=%p sock=%d state=%d "
+#if PUBNUB_USE_MULTIPLE_ADDRESSES
+            "ipv4_idx=%u/%u "
+#if PUBNUB_USE_IPV6
+            "ipv6_idx=%u/%u "
+#endif
+#endif
+            "tid=%lu\n",
+            (void*)pb, (int)pb->pal.socket, (int)pb->state,
+#if PUBNUB_USE_MULTIPLE_ADDRESSES
+            (unsigned)pb->spare_addresses.ipv4_index,
+            (unsigned)pb->spare_addresses.n_ipv4,
+#if PUBNUB_USE_IPV6
+            (unsigned)pb->spare_addresses.ipv6_index,
+            (unsigned)pb->spare_addresses.n_ipv6,
+#endif
+#endif
+            (unsigned long)pthread_self());
+
 #if defined(_WIN32)
     rslt = getsockopt(
         pb->pal.socket,
@@ -1119,6 +1140,7 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
             pb,
             "Socket connection failed. Socket status check result: %d",
             WSAGetLastError());
+        fprintf(stderr, "[PB-DBG] check_connect EXIT pb=%p rv=failed(win-getsockopt)\n", (void*)pb);
         return pbpal_connect_failed;
     }
 #else
@@ -1133,6 +1155,7 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
             pb,
             "Socket connection failed. Socket status check result: %d",
             rslt);
+        fprintf(stderr, "[PB-DBG] check_connect EXIT pb=%p rv=failed(getsockopt)\n", (void*)pb);
         return pbpal_connect_failed;
     }
 #endif /* defined(_WIN32) */
@@ -1156,6 +1179,8 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
         pb->flags.trySSL = pb->options.useSSL;
 #endif
 #endif /* PUBNUB_USE_MULTIPLE_ADDRESSES */
+        fprintf(stderr, "[PB-DBG] check_connect EXIT pb=%p rv=failed(error_code=%d) retry_after_close=%d\n",
+                (void*)pb, error_code, (int)pb->flags.retry_after_close);
         return pbpal_connect_failed;
     }
 
@@ -1164,6 +1189,7 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
     rslt = select(pb->pal.socket + 1, NULL, &write_set, NULL, &timev);
     if (SOCKET_ERROR == rslt) {
         PUBNUB_LOG_ERROR(pb, "Socket select() error.");
+        fprintf(stderr, "[PB-DBG] check_connect EXIT pb=%p rv=resource_failure(select)\n", (void*)pb);
         return pbpal_connect_resource_failure;
     }
     else if (rslt > 0) {
@@ -1172,8 +1198,10 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
         // Complete TCP Keep-Alive configuration if connection established.
         pbpal_set_tcp_keepalive(pb);
 #endif /* defined(_WIN32) */
+        fprintf(stderr, "[PB-DBG] check_connect EXIT pb=%p rv=success\n", (void*)pb);
         return pbpal_connect_success;
     }
+    fprintf(stderr, "[PB-DBG] check_connect EXIT pb=%p rv=wouldblock\n", (void*)pb);
     return pbpal_connect_wouldblock;
 }
 
