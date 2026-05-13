@@ -43,6 +43,19 @@ void pbpal_ntf_callback_save_socket(struct pbpal_poll_data* data, pubnub_t* pb)
     PUBNUB_ASSERT_OPT(data != NULL);
 
     if (INVALID_SOCKET == sockt) { return; }
+    /* TEMPORARY (SDWAN-1386): Guard against stack-smash from FD_SET when the
+     * socket fd is >= FD_SETSIZE. */
+    if ((int)sockt < 0 || (int)sockt >= FD_SETSIZE) {
+#if PUBNUB_USE_LOGGER
+        PUBNUB_LOG_ERROR(
+            pb,
+            "save_socket: socket fd %d is out of range for FD_SET "
+            "(FD_SETSIZE=%d). Skipping to avoid stack corruption.",
+            (int)sockt,
+            (int)FD_SETSIZE);
+#endif
+        return;
+    }
     PUBNUB_ASSERT(!FD_ISSET(sockt, &data->exceptfds));
     PUBNUB_ASSERT(!FD_ISSET(sockt, &data->writefds));
     PUBNUB_ASSERT(!FD_ISSET(sockt, &data->readfds));
@@ -123,6 +136,18 @@ void pbpal_ntf_callback_update_socket(
             FD_CLR(sckt, &data->readfds);
 
             sckt = pubnub_get_native_socket(data->apb[i]);
+            /* TEMPORARY (SDWAN-1386): Guard FD_SET against fd >= FD_SETSIZE. */
+            if ((int)sckt < 0 || (int)sckt >= FD_SETSIZE) {
+#if PUBNUB_USE_LOGGER
+                PUBNUB_LOG_ERROR(
+                    pb,
+                    "update_socket: socket fd %d is out of range for FD_SET "
+                    "(FD_SETSIZE=%d). Skipping to avoid stack corruption.",
+                    (int)sckt,
+                    (int)FD_SETSIZE);
+#endif
+                break;
+            }
             FD_CLR(sckt, &data->readfds);
             FD_SET(sckt, &data->writefds);
             FD_SET(sckt, &data->exceptfds);
@@ -140,6 +165,18 @@ int pbpal_ntf_watch_out_events(struct pbpal_poll_data* data, pubnub_t* pbp)
     PUBNUB_ASSERT_OPT(data != NULL);
     if (!we_ve_got_ya(data, pbp)) { return -1; }
 
+    /* TEMPORARY (SDWAN-1386): Guard FD_SET against fd >= FD_SETSIZE. */
+    if ((int)scket < 0 || (int)scket >= FD_SETSIZE) {
+#if PUBNUB_USE_LOGGER
+        PUBNUB_LOG_ERROR(
+            pbp,
+            "watch_out_events: socket fd %d is out of range for FD_SET "
+            "(FD_SETSIZE=%d). Skipping to avoid stack corruption.",
+            (int)scket,
+            (int)FD_SETSIZE);
+#endif
+        return -1;
+    }
     FD_CLR(scket, &data->readfds);
     FD_SET(scket, &data->writefds);
 
@@ -154,6 +191,18 @@ int pbpal_ntf_watch_in_events(struct pbpal_poll_data* data, pubnub_t* pbp)
     PUBNUB_ASSERT_OPT(data != NULL);
     if (!we_ve_got_ya(data, pbp)) { return -1; }
 
+    /* TEMPORARY (SDWAN-1386): Guard FD_SET against fd >= FD_SETSIZE. */
+    if ((int)scket < 0 || (int)scket >= FD_SETSIZE) {
+#if PUBNUB_USE_LOGGER
+        PUBNUB_LOG_ERROR(
+            pbp,
+            "watch_in_events: socket fd %d is out of range for FD_SET "
+            "(FD_SETSIZE=%d). Skipping to avoid stack corruption.",
+            (int)scket,
+            (int)FD_SETSIZE);
+#endif
+        return -1;
+    }
     FD_SET(scket, &data->readfds);
     FD_CLR(scket, &data->writefds);
 

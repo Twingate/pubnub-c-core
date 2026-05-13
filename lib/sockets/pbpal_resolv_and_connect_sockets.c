@@ -1159,6 +1159,34 @@ enum pbpal_resolv_n_connect_result pbpal_check_connect(pubnub_t* pb)
         return pbpal_connect_failed;
     }
 
+    /* TEMPORARY (SDWAN-1386): Log fd, max fd seen so far, and FD_SETSIZE on
+     * every poll; guard against stack-smash from FD_SET when the socket fd is
+     * >= FD_SETSIZE. select()/FD_SET cannot represent fds at or above
+     * FD_SETSIZE and FD_SET will write past the fd_set buffer (UB). Detect
+     * this and fail the connect cleanly instead of corrupting the stack.
+     * Long-term fix: replace select() with poll() in pubnub. */
+    {
+        static int s_max_socket_fd_seen = -1;
+        const int cur_fd = (int)pb->pal.socket;
+        if (cur_fd > s_max_socket_fd_seen) {
+            s_max_socket_fd_seen = cur_fd;
+        }
+        PUBNUB_LOG_DEBUG(
+            pb,
+            "pbpal_check_connect: socket fd=%d, max_fd_seen=%d, FD_SETSIZE=%d",
+            cur_fd,
+            s_max_socket_fd_seen,
+            (int)FD_SETSIZE);
+    }
+    if ((int)pb->pal.socket < 0 || (int)pb->pal.socket >= FD_SETSIZE) {
+        PUBNUB_LOG_ERROR(
+            pb,
+            "Socket fd %d is out of range for FD_SET (FD_SETSIZE=%d). "
+            "Aborting connect to avoid stack corruption.",
+            (int)pb->pal.socket,
+            (int)FD_SETSIZE);
+        return pbpal_connect_failed;
+    }
     FD_ZERO(&write_set);
     FD_SET(pb->pal.socket, &write_set);
     rslt = select(pb->pal.socket + 1, NULL, &write_set, NULL, &timev);
